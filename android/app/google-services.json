@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1028714381060",
+    "firebase_url": "https://quarantinegames-2f65a.firebaseio.com",
+    "project_id": "quarantinegames-2f65a",
+    "storage_bucket": "quarantinegames-2f65a.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1028714381060:android:58772fb39d9f3ceae01a51",
+        "android_client_info": {
+          "package_name": "com.quarantinegames.pictionary"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1028714381060-nm1lcjafj0hhlnunsn9ch4ohip4n6rhu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.quarantinegames.pictionary",
+            "certificate_hash": "cee7ad4c747293157e798eeb4fe8ba3344c559a5"
+          }
+        },
+        {
+          "client_id": "1028714381060-c4hh0b43pl2h73o42rt14f4t96rrj47c.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCP985r6V3ssz_gTn4Wu5PhAIjDVclHVmg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1028714381060-c4hh0b43pl2h73o42rt14f4t96rrj47c.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

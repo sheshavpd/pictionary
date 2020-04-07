@@ -1,0 +1,5 @@
+Android release:
+1) Configure release sha-1 fingerprint (https://medium.com/flutter-community/flutter-implementing-google-sign-in-71888bca24ed)
+
+ios Release:
+1) Configure firebase authentication (https://medium.com/flutter-community/flutter-implementing-google-sign-in-71888bca24ed)
