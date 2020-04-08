@@ -2,13 +2,13 @@ import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
 import 'package:pictionary/common/pretty_print.dart';
+import 'package:pictionary/models/Player.dart';
 import 'package:pictionary/models/game_answer.dart';
 import 'package:pictionary/models/game_details.dart';
 
 abstract class GameState extends Equatable {
   @override
   List<Object> get props => [];
-
 }
 
 class GameNotPlaying extends GameState {
@@ -40,10 +40,12 @@ class GameCreateFailed extends GameState {
 class GamePlaying extends GameState {
   final List<GameAnswer> answers;
   final List<String> wordsToChoose;
+  final Map drawScores;
   final String gameRoomID;
   final String gameRoomNick;
   final String hint;
   final String lastWord;
+  final Player lastWinner;
   final GameDetails gameDetails;
 
   GamePlaying(
@@ -53,14 +55,18 @@ class GamePlaying extends GameState {
       this.gameRoomNick,
       this.hint,
       this.lastWord,
+      this.lastWinner,
+      this.drawScores,
       this.answers});
 
   GamePlaying copyWith(
       {GameDetails gameDetails,
       List<GameAnswer> answers,
       List<String> wordsToChoose,
+      Map drawScores,
       String gameRoomID,
       String gameRoomNick,
+        Player lastWinner,
       String hint,
       String lastWord}) {
     return GamePlaying(
@@ -70,6 +76,8 @@ class GamePlaying extends GameState {
         gameRoomID: gameRoomID ?? this.gameRoomID,
         gameRoomNick: gameRoomNick ?? this.gameRoomNick,
         hint: hint ?? this.hint,
+        lastWinner: lastWinner ?? this.lastWinner,
+        drawScores: drawScores ?? this.drawScores,
         lastWord: lastWord ?? this.lastWord);
   }
 
@@ -80,10 +88,11 @@ class GamePlaying extends GameState {
         hint,
         lastWord,
         wordsToChoose,
+    lastWinner,
         gameDetails,
+        drawScores,
         answers,
       ];
-
 
   @override
   String toString() {
@@ -92,8 +101,10 @@ class GamePlaying extends GameState {
       'gameRoomNick': gameRoomNick,
       'hint': hint,
       'lastWord': lastWord,
+      'lastWinner': lastWinner?.toString() ?? 'N/A',
       'wordsToChoose': wordsToChoose?.toString() ?? 'N/A',
-      'gameDetails':  gameDetails?.toString() ?? 'N/A',
+      'gameDetails': gameDetails?.toString() ?? 'N/A',
+      'drawScores': drawScores?.toString() ?? 'N/A',
       'answers': answers?.toString() ?? 'N/A',
     });
   }

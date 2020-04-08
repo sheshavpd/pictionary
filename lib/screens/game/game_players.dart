@@ -123,7 +123,10 @@ class PlayersList extends StatelessWidget {
 
   Widget _userCurrentRoundScore(Player player, context) {
     GamePlaying state = BlocProvider.of<GameBloc>(context).state as GamePlaying;
-    if (state.gameDetails.state == GameStateConstants.CHOOSING && player.drawScore != null && player.drawScore != 0)
+    if (state.gameDetails.state == GameStateConstants.CHOOSING &&
+        state.drawScores != null &&
+        state.drawScores[player.uid] != null &&
+        state.drawScores[player.uid] != 0)
       return Positioned(
         bottom: 0,
         right: 0,
@@ -132,7 +135,7 @@ class PlayersList extends StatelessWidget {
           child: CircleAvatar(
             backgroundColor: Colors.limeAccent,
             radius: 10,
-            child: Text("${player.drawScore}",
+            child: Text("${state.drawScores[player.uid]}",
                 style: TextStyle(
                     fontSize: 13,
                     color:

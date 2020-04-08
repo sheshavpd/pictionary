@@ -12,14 +12,12 @@ class Player extends Equatable {
 
   final int currentScore;
   final int totalScore;
-  final int drawScore; //Score of one draw.
 
   Player(
       {@required this.uid,
       @required this.nick,
       @required this.imgURL,
       @required this.currentScore,
-      this.drawScore,
       @required this.totalScore});
 
   static Player fromJSON(Map pJsonMap) {
@@ -28,7 +26,6 @@ class Player extends Equatable {
         nick: pJsonMap['nick'],
         imgURL: pJsonMap['avatar'],
         currentScore: pJsonMap['score'],
-        drawScore: 0,
         totalScore: pJsonMap['totalScore']);
   }
 
@@ -36,7 +33,6 @@ class Player extends Equatable {
       {String nick,
       String imgURL,
       String uid,
-        int drawScore,
       int currentScore,
       int totalScore}) {
     return Player(
@@ -44,7 +40,6 @@ class Player extends Equatable {
       imgURL: imgURL ?? this.imgURL,
       nick: nick ?? this.nick,
       currentScore: currentScore ?? this.currentScore,
-      drawScore: drawScore ?? this.drawScore,
       totalScore: totalScore ?? this.totalScore,
     );
   }
@@ -52,7 +47,7 @@ class Player extends Equatable {
   @override
   // TODO: implement props
   List<Object> get props =>
-      [this.uid, this.nick, this.imgURL, this.currentScore, this.totalScore, this.drawScore];
+      [this.uid, this.nick, this.imgURL, this.currentScore, this.totalScore];
 
   @override
   String toString() {
@@ -61,7 +56,6 @@ class Player extends Equatable {
       'nick':  this.nick,
       'imgURL':  this.imgURL,
       'currentScore':  this.currentScore,
-      'drawScore':  this.drawScore,
       'totalScore':  this.totalScore
     });
   }

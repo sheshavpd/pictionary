@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pictionary/blocs/game/game.dart';
 import 'package:pictionary/models/game_answer.dart';
+import 'package:pictionary/widgets/message_bubble.dart';
 
 class GameMessages extends StatelessWidget {
   @override
@@ -93,44 +94,65 @@ class _MessageListState extends State<_MessageList> {
 
   _buildMessageItem(List<GameAnswer> messages, context, index) {
     final currentAnswer = messages.elementAt(index).correctAnswer;
-    return SizedBox(
-      /*key: ValueKey(messages[index]['key']),*/
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Container(
-          margin: EdgeInsets.all(3),
-          padding: EdgeInsets.all(3),
-          decoration: BoxDecoration(
-              color: currentAnswer ? Colors.green : Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Color.fromARGB(40, 0, 0, 0),
-                  blurRadius: 1.0, // has the effect of softening the shadow
-                  spreadRadius: 0.2, // has the effect of extending the shadow
-                  offset: Offset(
-                    0.0, // horizontal, move right 10
-                    0.0, // vertical, move down 10
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: <Widget>[
+        SizedBox(
+          /*key: ValueKey(messages[index]['key']),*/
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              constraints: BoxConstraints(maxWidth: 120),
+              margin: EdgeInsets.only(top: 2.5, bottom: 2.5),
+              padding: EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                  color: currentAnswer ? Colors.green : Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color.fromARGB(40, 0, 0, 0),
+                      blurRadius: 1.0, // has the effect of softening the shadow
+                      spreadRadius: 0.2, // has the effect of extending the shadow
+                      offset: Offset(
+                        0.0, // horizontal, move right 10
+                        0.0, // vertical, move down 10
+                      ),
+                    )
+                  ],
+                  borderRadius: BorderRadius.circular(3)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(messages.elementAt(index).answer,
+                      maxLines: 4,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: currentAnswer ? Colors.white : Colors.black)),
+                  Container(
+                    child: Text(messages.elementAt(index).fromPlayer != null?messages.elementAt(index).fromPlayer.nick:"Couldn't fetch name",
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: currentAnswer
+                              ? Colors.green.shade900
+                              : Colors.deepPurple),
+                      overflow: TextOverflow.ellipsis,),
                   ),
-                )
-              ],
-              borderRadius: BorderRadius.circular(3)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(messages.elementAt(index).answer,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: currentAnswer ? Colors.white : Colors.black)),
-              Text(messages.elementAt(index).fromPlayer != null?messages.elementAt(index).fromPlayer.nick:"Couldn't fetch name",
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: currentAnswer
-                          ? Colors.green.shade900
-                          : Colors.deepPurple)),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
-      ),
+        Transform.translate(offset: Offset(-2, 0),
+          child: SizedBox(
+            width: 15,
+            height: 15,
+            child: CustomPaint(
+                size: Size(180, 180),
+                painter: MessageBubble(color: currentAnswer ? Colors.green : Colors.white)
+            ),
+          ),
+        )
+
+      ],
     );
   }
 

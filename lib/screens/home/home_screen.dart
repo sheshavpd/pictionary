@@ -110,7 +110,7 @@ class HomeScreen extends StatelessWidget {
             builder: (context, state) {
               if(state is GamePlaying && state.gameDetails.players.length > 1)
                 return GameScreen();
-              else return GameScreen();
+              else return _Home();
             }
           ),
         ),

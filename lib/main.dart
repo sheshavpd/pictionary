@@ -81,6 +81,7 @@ class AppRoot extends StatelessWidget {
         },
         child: BotToastInit(
           child: MaterialApp(
+            debugShowCheckedModeBanner: false,
             title: 'Pictionary',
             navigatorObservers: [BotToastNavigatorObserver()],
             theme: ThemeData(

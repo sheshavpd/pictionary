@@ -6,6 +6,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:pictionary/blocs/game/game_sv_events.dart';
 import 'package:pictionary/common/app_logger.dart';
+import 'package:pictionary/common/pretty_print.dart';
 import 'package:pictionary/models/Player.dart';
 import 'package:pictionary/models/game_answer.dart';
 import 'package:pictionary/models/game_details.dart';
@@ -29,7 +30,8 @@ class GameBloc extends Bloc<GameEvent, GameState> {
 
   @override
   GameNotPlaying get initialState => GameNotPlaying();
-  User get _user => _gameRepository.user;
+
+  User get user => _gameRepository.user;
 
   static const _MAX_ANSWERS = 15;
 
@@ -42,10 +44,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       if (currentState is GamePlaying) {
         _socket.sendMessage(json.encode({
           'type': GameEventConstants.USER_LEFT,
-          'payload': {
-            'gameRoomID': currentState.gameRoomID,
-            'userID': _user.uid
-          }
+          'payload': {'gameRoomID': currentState.gameRoomID, 'userID': user.uid}
         }));
       }
       yield GameNotPlaying();
@@ -58,11 +57,11 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         yield GamePlaying(
             gameDetails: GameDetails(players: [
               Player(
-                  uid: _user.uid,
-                  nick: _user.nick,
+                  uid: user.uid,
+                  nick: user.nick,
                   totalScore: 0,
                   currentScore: 0,
-                  imgURL: _user.avatar)
+                  imgURL: user.avatar)
             ]),
             gameRoomID: newRoom['gameRoomID'],
             gameRoomNick: newRoom['roomUID']);
@@ -127,7 +126,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       final currentState = state;
       if (currentState is GamePlaying) {
         //Receive hint only if the current artist is not me.
-        if(currentState.gameDetails.currentArtist.uid != _user.uid)
+        if (currentState.gameDetails.currentArtist.uid != user.uid)
           yield currentState.copyWith(hint: event.hint);
       }
     }
@@ -135,9 +134,9 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     if (event is GameAnswerReceived) {
       final currentState = state;
       if (currentState is GamePlaying) {
-        final updatedAnswers = List<GameAnswer>.from(currentState.answers ?? []);
-        if (updatedAnswers.length >= _MAX_ANSWERS)
-          updatedAnswers.removeLast();
+        final updatedAnswers =
+            List<GameAnswer>.from(currentState.answers ?? []);
+        if (updatedAnswers.length >= _MAX_ANSWERS) updatedAnswers.removeLast();
         updatedAnswers.insert(0, event.gameAnswer);
         yield currentState.copyWith(answers: updatedAnswers);
       }
@@ -163,6 +162,11 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       if (currentState is GamePlaying) {
         yield currentState.copyWith(
             gameDetails: currentState.gameDetails.copyWithGD(event.gameDetails),
+            lastWord:
+                (currentState.gameDetails.state == GameStateConstants.ENDED
+                    ? ''
+                    : null),
+            //If last state was game ended, or ignore (null will keep the previous value)
             wordsToChoose: event.words);
       }
     }
@@ -179,16 +183,8 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     if (event is GameDrawingComplete) {
       final currentState = state;
       if (currentState is GamePlaying) {
-        List<Player> updatedPlayers = currentState.gameDetails.players.map((p) {
-          if (event.playerScores.containsKey(p.uid)) {
-            return p.copyWith(drawScore: event.playerScores[p.uid]);
-          } else
-            return p;
-        }).toList();
         yield currentState.copyWith(
-            gameDetails:
-                currentState.gameDetails.copyWith(players: updatedPlayers ),
-            lastWord: event.lastWord);
+            drawScores: event.playerScores, lastWord: event.lastWord);
       }
     }
 
@@ -201,17 +197,24 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           } else
             return p;
         }).toList();
-        updatedPlayers.sort((p1, p2) => p1.currentScore < p2.currentScore?1:-1);
+        updatedPlayers
+            .sort((p1, p2) => p1.currentScore < p2.currentScore ? 1 : -1);
         yield currentState.copyWith(
-            gameDetails:
-            currentState.gameDetails.copyWith(players: updatedPlayers, timeout: event.timeout, round: 0, state: GameStateConstants.ENDED));
+            drawScores: {},
+            lastWinner: updatedPlayers[0],
+            gameDetails: currentState.gameDetails.copyWith(
+                players: updatedPlayers,
+                timeout: event.timeout,
+                round: 0,
+                state: GameStateConstants.ENDED));
       }
     }
 
     if (event is ChoseWord) {
       final currentState = state;
       if (currentState is GamePlaying) {
-        _gameMsgListener.submitChosenWord(currentState.wordsToChoose.indexOf(event.word));
+        _gameMsgListener
+            .submitChosenWord(currentState.wordsToChoose.indexOf(event.word));
         yield currentState.copyWith(wordsToChoose: []);
       }
     }
@@ -224,56 +227,61 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     }
 
     if (event is GameTest) {
-      yield GamePlaying(gameDetails: GameDetails(
-        state: GameStateConstants.DRAWING,
-        players: [
-          Player(
-              uid: _user.uid,
-              nick: _user.nick,
-              totalScore: 0,
-              currentScore: 0,
-              imgURL: _user.avatar),
-          Player(
-              uid: _user.uid,
-              nick: _user.nick,
-              totalScore: 0,
-              currentScore: 0,
-              imgURL: _user.avatar),
-
-          Player(
-              uid: _user.uid,
-              nick: _user.nick,
-              totalScore: 0,
-              currentScore: 0,
-              imgURL: _user.avatar)],
-        round: 1,
-        startTimeMs: DateTime.now().millisecondsSinceEpoch,
-        targetTimeMs: DateTime.now().millisecondsSinceEpoch + 60000,
-        currentArtist: Player(
-            uid: _user.uid,
-            nick: _user.nick,
-            totalScore: 0,
-            currentScore: 0,
-            imgURL: _user.avatar)
-      ),
-        wordsToChoose: ["dummy word", "one more", "more than one"],
-        lastWord: "Test last word",
-        hint: "dsadasd",
-        answers: [
-          GameAnswer(fromPlayer: Player(
-              uid: _user.uid,
-              nick: _user.nick,
-              totalScore: 0,
-              currentScore: 0,
-              imgURL: _user.avatar), answer: "sdasd", correctAnswer: false),
-          GameAnswer(fromPlayer: Player(
-              uid: _user.uid,
-              nick: _user.nick,
-              totalScore: 0,
-              currentScore: 0,
-              imgURL: _user.avatar), answer: "Guessed it!", correctAnswer: true)
-        ]
-      );
+      yield GamePlaying(
+          gameDetails: GameDetails(
+              state: GameStateConstants.DRAWING,
+              players: [
+                Player(
+                    uid: user.uid,
+                    nick: user.nick,
+                    totalScore: 0,
+                    currentScore: 0,
+                    imgURL: user.avatar),
+                Player(
+                    uid: user.uid,
+                    nick: user.nick,
+                    totalScore: 0,
+                    currentScore: 0,
+                    imgURL: user.avatar),
+                Player(
+                    uid: user.uid,
+                    nick: user.nick,
+                    totalScore: 0,
+                    currentScore: 0,
+                    imgURL: user.avatar)
+              ],
+              round: 1,
+              startTimeMs: DateTime.now().millisecondsSinceEpoch,
+              targetTimeMs: DateTime.now().millisecondsSinceEpoch + 600000,
+              currentArtist: Player(
+                  uid: user.uid,
+                  nick: user.nick,
+                  totalScore: 0,
+                  currentScore: 0,
+                  imgURL: user.avatar)),
+          wordsToChoose: ["dummy word", "one more", "more than one"],
+          lastWord: "Test last word",
+          hint: "dsadasd",
+          answers: [
+            GameAnswer(
+                fromPlayer: Player(
+                    uid: user.uid,
+                    nick: user.nick,
+                    totalScore: 0,
+                    currentScore: 0,
+                    imgURL: user.avatar),
+                answer: "sdasd",
+                correctAnswer: false),
+            GameAnswer(
+                fromPlayer: Player(
+                    uid: user.uid,
+                    nick: user.nick,
+                    totalScore: 0,
+                    currentScore: 0,
+                    imgURL: user.avatar),
+                answer: "Guessed it!",
+                correctAnswer: true)
+          ]);
     }
   }
 

@@ -41,10 +41,49 @@ class GameStatsDialog extends StatelessWidget {
   Widget _gameEnded(GamePlaying state) {
     return (state.gameDetails.state == GameStateConstants.ENDED)
         ? Container(
-            margin: EdgeInsets.only(bottom: 5),
-            child: Text(
-              "GAME ENDED",
-              style: TextStyle(fontSize: 17, color: Colors.purple),
+            margin: EdgeInsets.only(bottom: 5, top:10),
+            child: Column(
+              children: <Widget>[
+                Text(
+                  "THE WINNER IS",
+                  style: TextStyle(fontSize: 15, color: Colors.purple),
+                ),
+                SizedBox(height: 3,),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Row(children: <Widget>[
+                      CircleAvatar(
+                        radius: 15,
+                        child: ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl:
+                            state.lastWinner.imgURL ?? '',
+                            placeholder: (context, url) => placeholderImage,
+                            errorWidget: (context, url, error) =>
+                            placeholderImage,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        margin: EdgeInsets.only(left: 5),
+                        constraints: BoxConstraints(
+                          maxWidth: 140,
+                        ),
+                        child: Text(state.lastWinner.nick,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                            TextStyle(color: Colors.deepPurple.shade900)),
+                      )
+                    ]),
+                  ],
+                ),
+                SizedBox(height: 10),
+                Text(
+                  "Starting a new game soon..",
+                  style: TextStyle(fontSize: 13, color: Colors.black),
+                )
+              ],
             ),
           )
         : SizedBox.shrink();
@@ -164,7 +203,7 @@ class GameStatsDialog extends StatelessWidget {
               ),
               child: Container(
                 decoration: new BoxDecoration(
-                    color: Color.fromARGB(220, 255, 255, 255),
+                    color: (state.gameDetails.state == GameStateConstants.ENDED?Colors.yellow.shade100:Colors.white).withAlpha(220),
                     shape: BoxShape.rectangle,
                     borderRadius: BorderRadius.circular(_Consts.padding)),
                 padding: EdgeInsets.only(
@@ -176,9 +215,9 @@ class GameStatsDialog extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min, // To make the card compact
                   children: <Widget>[
-                    _gameEnded(state),
                     _roundNum(state),
                     _lastWordWas(state, context),
+                    _gameEnded(state),
                     _artistChoosing(state),
                     _showTimeout(state),
                     _artistChoosableWords(state, context),

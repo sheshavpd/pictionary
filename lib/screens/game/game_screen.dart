@@ -8,6 +8,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:pictionary/blocs/game/game.dart';
 import 'package:pictionary/blocs/game/game_sv_events.dart';
 import 'package:pictionary/repositories/game_repository.dart';
+import 'package:pictionary/screens/game/game_draw_screen.dart';
 import 'package:pictionary/screens/game/game_messages.dart';
 import 'package:pictionary/screens/game/game_stats.dart';
 import 'package:pictionary/screens/game/game_timeout.dart';
@@ -15,6 +16,7 @@ import 'package:pictionary/utils/helpers.dart';
 import 'package:pictionary/widgets/game_button.dart';
 import 'package:pictionary/widgets/placeholder_image.dart';
 
+import 'answer_hint.dart';
 import 'game_players.dart';
 
 const _HEADER_HEIGHT = 40.0;
@@ -22,26 +24,30 @@ const _HEADER_HEIGHT = 40.0;
 class GameScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    if (!(BlocProvider
-        .of<GameBloc>(context)
-        .state is GamePlaying)) {
-      BlocProvider
-          .of<GameBloc>(context).add(GameTest());
+    if (!(BlocProvider.of<GameBloc>(context).state is GamePlaying)) {
+      //BlocProvider.of<GameBloc>(context).add(GameTest());
       return SizedBox.shrink();
     }
     return BlocBuilder<GameBloc, GameState>(
       condition: (previous, present) {
-        return (present is GamePlaying) && (previous as GamePlaying).gameDetails.state !=
-            (present as GamePlaying).gameDetails.state;
+        return (present is GamePlaying) &&
+            (previous as GamePlaying).gameDetails.state !=
+                (present as GamePlaying).gameDetails.state;
       },
       builder: (context, state) {
         final cState = state as GamePlaying;
+        final iAmCurrentArtist = cState.gameDetails.currentArtist != null &&
+            cState.gameDetails.currentArtist.uid ==
+                BlocProvider.of<GameBloc>(context).user.uid;
         return Stack(
           children: <Widget>[
-            _GuessingScreen(),
-            cState.gameDetails.state == GameStateConstants.CHOOSING || cState.gameDetails.state == GameStateConstants.ENDED
-                ?
-            GameStatsDialog()
+            (cState.gameDetails.state == GameStateConstants.DRAWING &&
+                    iAmCurrentArtist)
+                ? GameDrawScreen()
+                : _GuessingScreen(),
+            cState.gameDetails.state == GameStateConstants.CHOOSING ||
+                    cState.gameDetails.state == GameStateConstants.ENDED
+                ? GameStatsDialog()
                 : SizedBox.shrink()
           ],
         );
@@ -75,7 +81,7 @@ class _GuessingScreen extends StatelessWidget {
               top: 5,
               child: Opacity(
                 opacity: 0.7,
-                child: _AnswerHint(),
+                child: AnswerHint(),
               ),
             )
           ],
@@ -88,17 +94,16 @@ class _GuessingScreen extends StatelessWidget {
   }
 }
 
-
 class _GameFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final roomNick = (BlocProvider.of<GameBloc>(context).state as GamePlaying).gameRoomNick;
+    final roomNick =
+        (BlocProvider.of<GameBloc>(context).state as GamePlaying).gameRoomNick;
     return Container(
       padding: EdgeInsets.all(10),
       decoration: BoxDecoration(
-          color: hslRelativeColor(color: Theme
-              .of(context)
-              .primaryColor, l: 0.3),
+          color:
+              hslRelativeColor(color: Theme.of(context).primaryColor, l: 0.3),
           boxShadow: [
             BoxShadow(
               color: Color.fromARGB(90, 0, 0, 0),
@@ -109,8 +114,7 @@ class _GameFooter extends StatelessWidget {
                 -5, // vertical, move down 10
               ),
             )
-          ]
-      ),
+          ]),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -118,7 +122,10 @@ class _GameFooter extends StatelessWidget {
           FancyButton(
             color: Colors.purple,
             size: 20,
-            child: Text("Invite", style: TextStyle(color: Colors.white, fontSize: 16),),
+            child: Text(
+              "Invite",
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
             onPressed: () {},
           ),
           Flexible(
@@ -126,8 +133,7 @@ class _GameFooter extends StatelessWidget {
               margin: EdgeInsets.only(left: 5, right: 5),
               decoration: BoxDecoration(
                   border: Border.all(color: Colors.white, width: 1),
-                  borderRadius: BorderRadius.circular(5)
-              ),
+                  borderRadius: BorderRadius.circular(5)),
               child: FlatButton(
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: roomNick));
@@ -187,7 +193,6 @@ class _GameFooter extends StatelessWidget {
   }
 }
 
-
 const texts = [
   "!23132",
   "sdasdsad",
@@ -208,13 +213,12 @@ class _AnswerField extends StatefulWidget {
 
 class __AnswerFieldState extends State<_AnswerField> {
   final _controller = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.only(left: 0, right: 5),
-      color: hslRelativeColor(color: Theme
-          .of(context)
-          .primaryColor, l: 0.45),
+      color: hslRelativeColor(color: Theme.of(context).primaryColor, l: 0.45),
       child: Row(
         children: <Widget>[
           Flexible(
@@ -233,9 +237,7 @@ class __AnswerFieldState extends State<_AnswerField> {
             ),
           ),
           FancyButton(
-            color: Theme
-                .of(context)
-                .primaryColorDark,
+            color: Theme.of(context).primaryColorDark,
             size: 20,
             child: Icon(
               FontAwesomeIcons.paperPlane,
@@ -243,66 +245,11 @@ class __AnswerFieldState extends State<_AnswerField> {
               size: 20.0,
             ),
             onPressed: () {
-              if(_controller.text.trim() == "")
-                return;
-              BlocProvider.of<GameBloc>(context).add(
-                  GuessSubmitted(_controller.text.trim()));
+              if (_controller.text.trim() == "") return;
+              BlocProvider.of<GameBloc>(context)
+                  .add(GuessSubmitted(_controller.text.trim()));
               _controller.text = "";
             },
-          )
-        ],
-      ),
-    );
-  }
-}
-
-
-class _AnswerHint extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final state = (BlocProvider
-        .of<GameBloc>(context)
-        .state as GamePlaying);
-    if(state.gameDetails.currentArtist == null || state.hint == null)
-      return SizedBox.shrink();
-    final user = RepositoryProvider
-        .of<GameRepository>(context)
-        .user;
-    final isCurrentArtist = state.gameDetails.currentArtist.uid == user.uid;
-    final hint = isCurrentArtist ? state.hint : state.hint.split("").join(" ");
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.amber),
-        borderRadius: BorderRadius.circular(5),
-      ),
-      padding: EdgeInsets.all(5),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            transform: Matrix4.translationValues(-20, 0, 0),
-            padding: EdgeInsets.all(5),
-            decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(5), color: Colors.amber),
-            child: Icon(
-              isCurrentArtist ? FontAwesomeIcons.pencilAlt : FontAwesomeIcons
-                  .lightbulb,
-              color: hslRelativeColor(s: -0.2, l: -0.4, color: Colors.amber),
-              size: 20.0,
-            ),
-          ),
-          Container(
-            transform: Matrix4.translationValues(-10, 0, 0),
-            child: Text(
-              hint,
-              style: TextStyle(
-                fontSize: 15.0,
-                fontWeight: FontWeight.w700,
-                color: hslRelativeColor(s: -0.2, l: -0.4, color: Colors.amber),
-              ),
-            ),
           )
         ],
       ),
@@ -328,10 +275,7 @@ class _GameCanvas extends StatelessWidget {
           ),
         ],
       ),
-      height: MediaQuery
-          .of(context)
-          .size
-          .width * 9 / 16,
+      height: MediaQuery.of(context).size.width * 9 / 16,
     );
   }
 }
@@ -343,33 +287,34 @@ class _GameHeader extends StatelessWidget {
       condition: (previous, present) {
         if (previous is GamePlaying && present is GamePlaying) {
           return (previous.gameDetails.currentArtist !=
-              present.gameDetails.currentArtist ||
+                  present.gameDetails.currentArtist ||
               previous.gameDetails.targetTimeMs !=
-                  present.gameDetails.targetTimeMs
-          );
+                  present.gameDetails.targetTimeMs);
         }
         return false;
       },
       builder: (context, state) {
         final cState = state as GamePlaying;
-        if(cState.gameDetails.currentArtist == null)
-          return SizedBox.shrink();
+        if (cState.gameDetails.currentArtist == null) return SizedBox.shrink();
         return Stack(
           children: <Widget>[
             Container(
               height: _HEADER_HEIGHT,
-              child: GameTimeout(startTimeMs: cState.gameDetails.startTimeMs, targetTimeMs: cState.gameDetails.targetTimeMs,
-              center: (String secondsRemaining){
-                return Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    padding: EdgeInsets.only(right: 10),
-                    child: Text("$secondsRemaining",
-                    style: TextStyle(color: Colors.orange.shade900),
-                  ),
-                  ));
-              },
-              color: Theme.of(context).primaryColor.withAlpha(60),
+              child: GameTimeout(
+                startTimeMs: cState.gameDetails.startTimeMs,
+                targetTimeMs: cState.gameDetails.targetTimeMs,
+                center: (String secondsRemaining) {
+                  return Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: EdgeInsets.only(right: 10),
+                        child: Text(
+                          "$secondsRemaining",
+                          style: TextStyle(color: Colors.orange.shade900),
+                        ),
+                      ));
+                },
+                color: Theme.of(context).primaryColor.withAlpha(60),
               ),
             ),
             SizedBox.expand(
@@ -383,9 +328,11 @@ class _GameHeader extends StatelessWidget {
                         radius: 15,
                         child: ClipOval(
                           child: CachedNetworkImage(
-                            imageUrl: cState.gameDetails.currentArtist.imgURL ?? '',
+                            imageUrl:
+                                cState.gameDetails.currentArtist.imgURL ?? '',
                             placeholder: (context, url) => placeholderImage,
-                            errorWidget: (context, url, error) => placeholderImage,
+                            errorWidget: (context, url, error) =>
+                                placeholderImage,
                           ),
                         ),
                       ),
@@ -396,8 +343,8 @@ class _GameHeader extends StatelessWidget {
                         ),
                         child: Text(cState.gameDetails.currentArtist.nick,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: Colors.deepPurple.shade900)),
+                            style:
+                                TextStyle(color: Colors.deepPurple.shade900)),
                       )
                     ]),
                   ],
