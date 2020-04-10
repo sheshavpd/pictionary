@@ -1,9 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:pictionary/blocs/canvas/canvas.dart';
 import 'package:pictionary/blocs/game/game.dart';
+import 'package:pictionary/models/stroke_session.dart';
 import 'package:pictionary/screens/game/game_messages.dart';
 import 'package:pictionary/screens/game/game_timeout.dart';
+import 'package:pictionary/widgets/bar_color_picker.dart';
+import 'package:pictionary/widgets/fancy_icon_button.dart';
+import 'package:pictionary/widgets/game_button.dart';
+import 'package:rxdart/rxdart.dart';
 
 import 'answer_hint.dart';
 
@@ -13,6 +22,7 @@ class GameDrawScreen extends StatefulWidget {
 }
 
 const _HEADER_HEIGHT = 40.0;
+
 class _GameDrawScreenState extends State<GameDrawScreen> {
   @override
   void initState() {
@@ -21,13 +31,11 @@ class _GameDrawScreenState extends State<GameDrawScreen> {
       DeviceOrientation.landscapeLeft,
     ]);
   }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
-      children: <Widget>[
-        WriteScreen(),
-        _DrawOverlays()
-      ],
+      children: <Widget>[_DrawCanvas(), _DrawOverlays()],
     );
   }
 
@@ -45,104 +53,213 @@ class _DrawOverlays extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cState = BlocProvider.of<GameBloc>(context).state as GamePlaying;
-    return IgnorePointer(
-      ignoring: true,
-      child: Stack(
-        children: <Widget>[
-          Container(
-            height: _HEADER_HEIGHT,
-            child: GameTimeout(startTimeMs: cState.gameDetails.startTimeMs, targetTimeMs: cState.gameDetails.targetTimeMs,
-              center: (String secondsRemaining){
-                return Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      padding: EdgeInsets.only(left: 10),
-                      child: Text("$secondsRemaining",
-                        style: TextStyle(color: Colors.orange.shade900),
-                      ),
-                    ));
-              },
-              color: Theme.of(context).primaryColor.withAlpha(60),
-            ),
+    return Stack(
+      children: <Widget>[
+        IgnorePointer(
+          ignoring: true,
+          child: Stack(
+            children: <Widget>[
+              Container(
+                height: _HEADER_HEIGHT,
+                child: GameTimeout(
+                  startTimeMs: cState.gameDetails.startTimeMs,
+                  targetTimeMs: cState.gameDetails.targetTimeMs,
+                  center: (String secondsRemaining) {
+                    return Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          padding: EdgeInsets.only(left: 10),
+                          child: Text(
+                            "$secondsRemaining",
+                            style: TextStyle(color: Colors.orange.shade900),
+                          ),
+                        ));
+                  },
+                  color: Theme.of(context).primaryColor.withAlpha(60),
+                ),
+              ),
+              Container(
+                margin: EdgeInsets.only(top: 10),
+                alignment: Alignment.topCenter,
+                child: Text("${cState.hint}",
+                    style: TextStyle(
+                        fontSize: 17,
+                        color: Theme.of(context).primaryColorDark)),
+              ),
+              Positioned(right: 0, bottom: 0, top: 0, child: GameMessages()),
+            ],
           ),
-          Container(
-            margin: EdgeInsets.only(top: _HEADER_HEIGHT + 10),
-            alignment: Alignment.topCenter,
-            child: Opacity(
-              opacity: 0.7,
-              child: AnswerHint(),
-            ),
-          ),
-          Positioned(
-              right: 0,
-              bottom: 0,
-              top:0,
-              child: GameMessages()),
-          Positioned(
-            left:5,
-            bottom:5,
-            child: Text("Draw in landscape orientation", style: TextStyle(fontSize: 13, color: Colors.grey),)
-          )
-        ],
+        ),
+        Positioned(left: 5, bottom: 0, child: _CanvasSettings()),
+      ],
+    );
+  }
+}
+
+class _CanvasSettings extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(maxWidth: 250),
+      padding: EdgeInsets.all(5),
+      transform: Matrix4.translationValues(0, 1, 0),
+      decoration: BoxDecoration(
+          color: Colors.indigo.shade50,
+          border: Border.all(color: Colors.indigo.shade200, width: 1),
+          borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(10), topRight: Radius.circular(10))),
+      margin: EdgeInsets.all(0),
+      child: BlocBuilder<CanvasBloc, CanvasState>(
+        condition: (oldState, newState) {
+          return (oldState.color != newState.color ||
+              oldState.strokeSize != newState.strokeSize ||
+              oldState.erasing != newState.erasing);
+        },
+        builder: (context, state) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              IgnorePointer(
+                ignoring: state.erasing,
+                child: Opacity(
+                  opacity: state.erasing ? 0.5 : 1.0,
+                  child: BarColorPicker(
+                    colorListener: (color) {
+                      BlocProvider.of<CanvasBloc>(context)
+                          .add(DrawPropsChanged(color: color));
+                    },
+                    width: 200,
+                    initialColor: Color(state.color),
+                    cornerRadius: 10,
+                    thumbRadius: 10,
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 10,
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.max,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  FancyIconButton(
+                    color: state.erasing
+                        ? Colors.white
+                        : Theme.of(context).accentColor,
+                    icon: Icon(
+                      FontAwesomeIcons.pencilAlt,
+                      size: 14,
+                      color: state.erasing
+                          ? Theme.of(context).accentColor
+                          : Colors.white,
+                    ),
+                    onPressed: () {
+                      BlocProvider.of<CanvasBloc>(context)
+                          .add(DrawPropsChanged(erasing: false));
+                    },
+                  ),
+                  FancyIconButton(
+                    color: state.erasing
+                        ? Theme.of(context).accentColor
+                        : Colors.white,
+                    icon: Icon(FontAwesomeIcons.eraser,
+                        size: 14,
+                        color: state.erasing
+                            ? Colors.white
+                            : Theme.of(context).accentColor),
+                    onPressed: () {
+                      BlocProvider.of<CanvasBloc>(context)
+                          .add(DrawPropsChanged(erasing: true));
+                    },
+                  ),
+                  _StrokeSizeButton(strokeSize: 2, iconSize: 6),
+                  _StrokeSizeButton(strokeSize: 5, iconSize: 10),
+                  _StrokeSizeButton(strokeSize: 9, iconSize: 14),
+                  FancyIconButton(
+                    color: Colors.red,
+                    icon: Icon(FontAwesomeIcons.broom,
+                        size: 14, color: Colors.white),
+                    onPressed: () {
+                      BlocProvider.of<CanvasBloc>(context).add(ClearStrokeSessions());
+                    },
+                  )
+                ],
+              )
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-class KanjiPainter extends ChangeNotifier implements CustomPainter {
-  Color strokeColor;
-  var strokes = new List<List<Offset>>();
+class _StrokeSizeButton extends StatelessWidget {
+  final double strokeSize;
+  final double iconSize;
 
-  KanjiPainter(this.strokeColor);
+  const _StrokeSizeButton({Key key, this.strokeSize, this.iconSize})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final state = BlocProvider.of<CanvasBloc>(context).state;
+    return FancyIconButton(
+      color: state.strokeSize != strokeSize
+          ? Colors.white
+          : Theme.of(context).accentColor,
+      icon: Icon(FontAwesomeIcons.solidCircle,
+          size: iconSize,
+          color: state.strokeSize != strokeSize
+              ? Theme.of(context).accentColor
+              : Colors.white),
+      onPressed: () {
+        BlocProvider.of<CanvasBloc>(context)
+            .add(DrawPropsChanged(strokeSize: strokeSize));
+      },
+    );
+  }
+}
+
+class ScribblePainter extends ChangeNotifier implements CustomPainter {
+  List<StrokeSession> strokeSessions;
+
+  ScribblePainter(this.strokeSessions);
 
   bool hitTest(Offset position) => null;
 
-  void startStroke(Offset position) {
-    print("startStroke");
-    strokes.add([position]);
-    notifyListeners();
-  }
-
-  void appendStroke(Offset position) {
-    print("appendStroke");
-    var stroke = strokes.last;
-    stroke.add(position);
-    notifyListeners();
-  }
-
-  void endStroke() {
+  void rePaint() {
     notifyListeners();
   }
 
   @override
   void paint(Canvas canvas, Size size) {
-    print("paint!");
     var rect = Offset.zero & size;
     Paint fillPaint = new Paint();
-    fillPaint.color = Colors.yellow[100];
+    fillPaint.color = Colors.white;
     fillPaint.style = PaintingStyle.fill;
     canvas.drawRect(rect, fillPaint);
-
     Paint strokePaint = new Paint();
-    strokePaint.color = Colors.black;
     strokePaint.style = PaintingStyle.stroke;
+    strokePaint.strokeCap = StrokeCap.round;
 
-    for (var stroke in strokes) {
+    for (final strokeSession in strokeSessions) {
+      strokePaint.color = strokeSession.color;
+      strokePaint.strokeWidth = strokeSession.size;
       Path strokePath = new Path();
-      // Iterator strokeIt = stroke.iterator..moveNext();
-      // Offset start = strokeIt.current;
-      // strokePath.moveTo(start.dx, start.dy);
-      // while (strokeIt.moveNext()) {
-      //   Offset off = strokeIt.current;
-      //   strokePath.addP
-      // }
-      strokePath.addPolygon(stroke, false);
+      if (strokeSession.strokes.length > 0)
+        strokePath.moveTo(strokeSession.strokes.elementAt(0).dx * size.width,
+            strokeSession.strokes.elementAt(0).dy * size.height);
+
+      for (final strokePoint in strokeSession.strokes) {
+        strokePath.lineTo(
+            strokePoint.dx * size.width, strokePoint.dy * size.height);
+      }
       canvas.drawPath(strokePath, strokePaint);
     }
   }
 
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
+    return false;
   }
 
   @override
@@ -156,97 +273,98 @@ class KanjiPainter extends ChangeNotifier implements CustomPainter {
   }
 }
 
-class WriteScreen extends StatefulWidget {
+class _DrawCanvas extends StatefulWidget {
   @override
-  _WriteScreenState createState() => new _WriteScreenState();
+  _DrawCanvasState createState() => new _DrawCanvasState();
 }
 
-class _WriteScreenState extends State<WriteScreen> {
+class _DrawCanvasState extends State<_DrawCanvas> {
   GestureDetector touch;
   CustomPaint canvas;
-  KanjiPainter kanjiPainter;
+  ScribblePainter scribblePainter;
+  final mouseSubject = PublishSubject<Offset>();
+
+  double _canvasWidth = 0;
+  double _canvasHeight = 0;
+
+  Offset _prevOffset;
+
+  StrokeSession _currentStrokeSession;
+
+  void appendStroke(Offset position) {
+    //Update current stroke session directly instead of notifying bloc, because updating might be delayed by adding event to Bloc.
+    _currentStrokeSession.strokes.add(position);
+    scribblePainter
+        .rePaint(); //Just repaint here instead of notifying bloc. (Performance optimization)
+  }
 
   void panStart(DragStartDetails details) {
-    print(details.globalPosition);
-    kanjiPainter.startStroke(details.globalPosition);
+    final startOffset = Offset(details.localPosition.dx / _canvasWidth,
+        details.localPosition.dy / _canvasHeight);
+    CanvasBloc canvasBloc = BlocProvider.of<CanvasBloc>(context);
+    _currentStrokeSession = StrokeSession(
+        [startOffset],
+        canvasBloc.state.erasing ? Colors.white : Color(canvasBloc.state.color),
+        canvasBloc.state.strokeSize);
+    canvasBloc.add(AddStrokeSession(strokeSession: _currentStrokeSession));
+    _prevOffset = null;
+    mouseSubject.add(startOffset);
   }
 
   void panUpdate(DragUpdateDetails details) {
-    print(details.globalPosition);
-    kanjiPainter.appendStroke(details.globalPosition);
+    mouseSubject.add(Offset(details.localPosition.dx / _canvasWidth,
+        details.localPosition.dy / _canvasHeight));
   }
 
-  void panEnd(DragEndDetails details) {
-    kanjiPainter.endStroke();
-  }
+  StreamSubscription<Offset> _mouseMoveSubscription;
 
   @override
   void initState() {
     super.initState();
-    kanjiPainter = new KanjiPainter(const Color.fromRGBO(255, 255, 255, 1.0));
+    final canvasBloc = BlocProvider.of<CanvasBloc>(context);
+    scribblePainter = new ScribblePainter(canvasBloc.state.strokeSessions);
+    _mouseMoveSubscription =
+        mouseSubject.throttleTime(Duration(milliseconds: 20)).listen((offset) {
+      appendStroke(offset);
+      if (_prevOffset != null)
+        canvasBloc.add(AddStrokeOffset(from: _prevOffset, to: offset));
+      _prevOffset = offset;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    touch = new GestureDetector(
-      onPanStart: panStart,
-      onPanUpdate: panUpdate,
-      onPanEnd: panEnd,
-    );
+    touch = new GestureDetector(onPanStart: panStart, onPanUpdate: panUpdate);
 
-    canvas = new CustomPaint(
-      painter: kanjiPainter,
-      child: touch,
-      // child: new Text("Custom Painter"),
-      // size: const Size.square(100.0),
-    );
-    final width = MediaQuery.of(context).size.width;
-    return SizedBox.expand(
-      child: FittedBox(
-        alignment: Alignment.center,
-        fit: BoxFit.cover,
-        child: Container(
-          width: width,
-          height: width*9/16,
-          child: canvas,
-          //color: Colors.red.withAlpha(60),
+    canvas = new CustomPaint(painter: scribblePainter, child: touch);
+    _canvasWidth = MediaQuery.of(context).size.width;
+    _canvasHeight = _canvasWidth * 9 / 16;
+    return BlocListener<CanvasBloc, CanvasState>(
+      condition: (oldState, newState) =>
+          oldState.strokeSessions != newState.strokeSessions,
+      listener: (context, state) {
+        scribblePainter.strokeSessions = state.strokeSessions;
+        scribblePainter.rePaint();
+      },
+      child: SizedBox.expand(
+        child: FittedBox(
+          alignment: Alignment.center,
+          fit: BoxFit.cover,
+          child: Container(
+            width: _canvasWidth,
+            height: _canvasHeight,
+            child: canvas,
+            //color: Colors.red.withAlpha(60),
+          ),
         ),
       ),
     );
-
-    Container container = new Container(
-        padding: new EdgeInsets.all(20.0),
-        child: new ConstrainedBox(
-            constraints: const BoxConstraints.expand(),
-            child: new Card(
-              elevation: 10.0,
-              child: canvas,
-            )));
-
-    return new Scaffold(
-      appBar: new AppBar(title: new Text("Draw!")),
-      backgroundColor: const Color.fromRGBO(200, 200, 200, 1.0),
-      body: container,
-    );
   }
-}
 
-
-class _DrawCanvas extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    return SizedBox.expand(
-      child: FittedBox(
-        alignment: Alignment.center,
-        fit: BoxFit.cover,
-        child: Container(
-          width: width,
-          height: width*9/16,
-          //color: Colors.red.withAlpha(60),
-        ),
-      ),
-    );
+  void dispose() {
+    _mouseMoveSubscription?.cancel();
+    mouseSubject.close();
+    super.dispose();
   }
 }
-

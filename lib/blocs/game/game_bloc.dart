@@ -16,6 +16,7 @@ import 'package:pictionary/repositories/data_providers/game_msg_listener.dart';
 import 'package:pictionary/repositories/game_repository.dart';
 
 import 'package:bloc/bloc.dart';
+import 'package:pictionary/repositories/webrtc_conn_manager.dart';
 import 'package:pictionary/screens/game/game_similarity_notif.dart';
 import 'game.dart';
 
@@ -32,6 +33,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
   GameNotPlaying get initialState => GameNotPlaying();
 
   User get user => _gameRepository.user;
+  bool get isMicGranted => _gameRepository.micPermissionsGranted;
 
   static const _MAX_ANSWERS = 15;
 
@@ -50,6 +52,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       yield GameNotPlaying();
     }
     if (event is GameCreateRequested) {
+      await _gameRepository.tryMicPermission();
       yield GameCreating();
       try {
         //await Future.delayed(Duration(seconds: 3));
@@ -71,6 +74,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       }
     }
     if (event is GameJoinRequested) {
+      await _gameRepository.tryMicPermission();
       yield GameJoining();
       //await Future.delayed(Duration(seconds: 3));
       try {
@@ -105,6 +109,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       final currentState = state;
       if (currentState is GamePlaying &&
           currentState.gameRoomID == event.gameRoomID) {
+        WebRTCConnectionManager().disconnectPeer(event.playerUID);
         List<Player> currentPlayers =
             List<Player>.from(currentState.gameDetails.players);
         Player removedPlayer;

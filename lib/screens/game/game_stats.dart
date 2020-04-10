@@ -1,5 +1,6 @@
 import 'package:bot_toast/bot_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -41,14 +42,16 @@ class GameStatsDialog extends StatelessWidget {
   Widget _gameEnded(GamePlaying state) {
     return (state.gameDetails.state == GameStateConstants.ENDED)
         ? Container(
-            margin: EdgeInsets.only(bottom: 5, top:10),
+            margin: EdgeInsets.only(bottom: 5, top: 10),
             child: Column(
               children: <Widget>[
                 Text(
                   "THE WINNER IS",
                   style: TextStyle(fontSize: 15, color: Colors.purple),
                 ),
-                SizedBox(height: 3,),
+                SizedBox(
+                  height: 3,
+                ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
@@ -57,11 +60,10 @@ class GameStatsDialog extends StatelessWidget {
                         radius: 15,
                         child: ClipOval(
                           child: CachedNetworkImage(
-                            imageUrl:
-                            state.lastWinner.imgURL ?? '',
+                            imageUrl: state.lastWinner.imgURL ?? '',
                             placeholder: (context, url) => placeholderImage,
                             errorWidget: (context, url, error) =>
-                            placeholderImage,
+                                placeholderImage,
                           ),
                         ),
                       ),
@@ -73,7 +75,7 @@ class GameStatsDialog extends StatelessWidget {
                         child: Text(state.lastWinner.nick,
                             overflow: TextOverflow.ellipsis,
                             style:
-                            TextStyle(color: Colors.deepPurple.shade900)),
+                                TextStyle(color: Colors.deepPurple.shade900)),
                       )
                     ]),
                   ],
@@ -158,19 +160,27 @@ class GameStatsDialog extends StatelessWidget {
   }
 
   Widget _artistChoosableWords(GamePlaying state, BuildContext context) {
+    if (state.gameDetails.state != GameStateConstants.CHOOSING)
+      return SizedBox.shrink();
     final currentArtistUID =
         RepositoryProvider.of<GameRepository>(context).user.uid;
     return AnimatedSwitcher(
       duration: Duration(milliseconds: 400),
-      child: state.gameDetails.state == GameStateConstants.CHOOSING &&
-              state.gameDetails.currentArtist.uid == currentArtistUID
+      child: state.gameDetails.currentArtist.uid == currentArtistUID
           ? ChoosableWords(
               words: state.wordsToChoose ?? [],
               onClick: (word) {
                 BlocProvider.of<GameBloc>(context).add(ChoseWord(word));
               },
             )
-          : SizedBox.shrink(),
+          : Container(
+              margin: EdgeInsets.only(top: 5),
+              child: Text(
+                "A word is being chosen",
+                textAlign: TextAlign.center,
+                softWrap: true,
+              ),
+            ),
     );
   }
 
@@ -203,7 +213,10 @@ class GameStatsDialog extends StatelessWidget {
               ),
               child: Container(
                 decoration: new BoxDecoration(
-                    color: (state.gameDetails.state == GameStateConstants.ENDED?Colors.yellow.shade100:Colors.white).withAlpha(220),
+                    color: (state.gameDetails.state == GameStateConstants.ENDED
+                            ? Colors.yellow.shade100
+                            : Colors.white)
+                        .withAlpha(220),
                     shape: BoxShape.rectangle,
                     borderRadius: BorderRadius.circular(_Consts.padding)),
                 padding: EdgeInsets.only(

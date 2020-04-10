@@ -10,7 +10,7 @@ import 'package:pictionary/repositories/AppSocket.dart';
 
 class GameMsgHandler {
   StreamSubscription<String> _subscription;
-  final Map<String, Function> _msgHandlers = {};
+  final Map<dynamic, Function> _msgHandlers = {};
   final GameBloc gameBloc;
   final _socket = AppSocket();
 
@@ -45,20 +45,6 @@ class GameMsgHandler {
       }));
   }
 
-  /*class GameEventConstants {
-  static const GAME_SUCCESS = "GUESS_SUCCESS";
-  static const HINT = "HINT";
-  static const GUESS_SIMILAR = "GUESS_SIMILAR";
-  static const GUESS_FAIL = "GUESS_FAIL";
-  static const DRAWING_COMPLETE = "DRAWING_COMPLETE";
-  static const GUESS_SUBMIT = "GUESS_SUBMIT"; //to_sv
-  static const WORD_CHOSEN = "WORD_CHOSEN"; //to_sv
-  static const USER_LEFT = "USER_LEFT";
-  static const USER_JOINED = "USER_JOINED";
-  CHOOSING: "CHOOSING",
-    DRAWING: "DRAWING",
-    ENDED: "ENDED"
-}*/
   void _initHandlers() {
     _msgHandlers[GameEventConstants.USER_JOINED] = this.userJoinMessage;
     _msgHandlers[GameEventConstants.USER_LEFT] = this.userLeftMessage;

@@ -5,13 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:pictionary/blocs/canvas/canvas.dart';
 import 'package:pictionary/blocs/game/game.dart';
 import 'package:pictionary/blocs/game/game_sv_events.dart';
-import 'package:pictionary/repositories/game_repository.dart';
+import 'package:pictionary/repositories/mediastream_manager.dart';
+import 'package:pictionary/repositories/webrtc_conn_manager.dart';
 import 'package:pictionary/screens/game/game_draw_screen.dart';
 import 'package:pictionary/screens/game/game_messages.dart';
 import 'package:pictionary/screens/game/game_stats.dart';
 import 'package:pictionary/screens/game/game_timeout.dart';
+import 'package:pictionary/screens/game/scribble_painter_client.dart';
 import 'package:pictionary/utils/helpers.dart';
 import 'package:pictionary/widgets/game_button.dart';
 import 'package:pictionary/widgets/placeholder_image.dart';
@@ -21,13 +24,52 @@ import 'game_players.dart';
 
 const _HEADER_HEIGHT = 40.0;
 
-class GameScreen extends StatelessWidget {
+class GameScreen extends StatefulWidget {
+  @override
+  _GameScreenState createState() => _GameScreenState();
+}
+
+class _GameScreenState extends State<GameScreen> {
+  WebRTCConnectionManager _webRTCConnectionManager;
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    GameBloc gameBloc = BlocProvider.of<GameBloc>(context);
+    if(!gameBloc.isMicGranted || !(gameBloc.state is GamePlaying))
+      return;
+    _webRTCConnectionManager = WebRTCConnectionManager();
+    final players = (gameBloc.state as GamePlaying).gameDetails.players;
+    //If there are only 2 players, let the second player initiate the peer connection.
+    if(players.length <= 2 && players[0].uid != gameBloc.user.uid)
+      return;
+    players?.forEach((p) {
+      if(p.uid != gameBloc.user.uid)
+        _webRTCConnectionManager.connectPeer(p.uid);
+    });
+  }
   @override
   Widget build(BuildContext context) {
     if (!(BlocProvider.of<GameBloc>(context).state is GamePlaying)) {
       //BlocProvider.of<GameBloc>(context).add(GameTest());
       return SizedBox.shrink();
     }
+    return BlocProvider<CanvasBloc>(
+      create: (context) => CanvasBloc(BlocProvider.of<GameBloc>(context)),
+      child: _GameRoot(),
+    );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _webRTCConnectionManager.dispose();
+  }
+}
+
+class _GameRoot extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
     return BlocBuilder<GameBloc, GameState>(
       condition: (previous, present) {
         return (present is GamePlaying) &&
@@ -42,11 +84,11 @@ class GameScreen extends StatelessWidget {
         return Stack(
           children: <Widget>[
             (cState.gameDetails.state == GameStateConstants.DRAWING &&
-                    iAmCurrentArtist)
+                iAmCurrentArtist)
                 ? GameDrawScreen()
                 : _GuessingScreen(),
             cState.gameDetails.state == GameStateConstants.CHOOSING ||
-                    cState.gameDetails.state == GameStateConstants.ENDED
+                cState.gameDetails.state == GameStateConstants.ENDED
                 ? GameStatsDialog()
                 : SizedBox.shrink()
           ],
@@ -55,6 +97,7 @@ class GameScreen extends StatelessWidget {
     );
   }
 }
+
 
 class _GuessingScreen extends StatelessWidget {
   @override
@@ -193,18 +236,6 @@ class _GameFooter extends StatelessWidget {
   }
 }
 
-const texts = [
-  "!23132",
-  "sdasdsad",
-  "fsasdas",
-  "!23132",
-  "sdasdsad",
-  "fsasdas",
-  "!23132",
-  "sdasdsad",
-  "fsasdas"
-];
-//const texts = ["!23132", "sdasdsad", "fsasdas", "!23132"];
 
 class _AnswerField extends StatefulWidget {
   @override
@@ -275,7 +306,9 @@ class _GameCanvas extends StatelessWidget {
           ),
         ],
       ),
+      width: MediaQuery.of(context).size.width,
       height: MediaQuery.of(context).size.width * 9 / 16,
+      child: ScribbleClient(),
     );
   }
 }

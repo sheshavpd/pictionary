@@ -11,10 +11,19 @@ class GameEventConstants {
   static const WORD_CHOSEN = "WORD_CHOSEN"; //msg type to send to server
   static const USER_LEFT = "USER_LEFT";
   static const USER_JOINED = "USER_JOINED";
+  static const STROKE = 101;
+  static const CLEAR_BOARD = "CLEAR_BOARD";
 }
 
 class GameStateConstants {
   static const CHOOSING = "CHOOSING";
   static const DRAWING = "DRAWING";
   static const ENDED = "ENDED";
+}
+
+
+class PeerConnConstants {
+  static const OFFER = "OFFER";
+  static const ANSWER = "ANSWER";
+  static const CANDIDATE = "CANDIDATE";
 }

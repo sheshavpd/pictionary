@@ -5,12 +5,15 @@ import 'package:bloc/bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:logger/logger.dart';
+import 'package:pictionary/models/models.dart';
+import 'package:pictionary/repositories/mediastream_manager.dart';
 
 import 'AppConstants.dart';
 import 'blocs/authentication/authentication.dart';
 import 'blocs/connection/connection.dart';
 import 'common/app_logger.dart';
 import 'repositories/user_repository.dart';
+import 'repositories/webrtc_conn_manager.dart';
 import 'screens/home/home.dart';
 import 'screens/screens.dart';
 import 'widgets/loading_indicator.dart';
@@ -70,7 +73,6 @@ class AppRoot extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    //SystemChrome.setEnabledSystemUIOverlays([SystemUiOverlay.bottom]); // disable status bar
     return BlocProvider<AuthenticationBloc>(
       create: (context) {
         return authBloc;
@@ -113,11 +115,12 @@ class App extends StatelessWidget {
       builder: (context, state) {
         if (state is AuthenticationAuthenticated) {
           return BlocProvider<ConnectionBloc>(
+            lazy: false,
             create: (BuildContext context) {
               return ConnectionBloc(
                   BlocProvider.of<AuthenticationBloc>(context));
             },
-            child: const HomeScreen(),
+            child: HomeScreen(),
           );
         }
         if (state is AuthenticationUnauthenticated) {
@@ -131,3 +134,40 @@ class App extends StatelessWidget {
     );
   }
 }
+
+
+/*class TestRTC extends StatefulWidget {
+  const TestRTC();
+  @override
+  _TestRTCState createState() => _TestRTCState();
+}
+
+class _TestRTCState extends State<TestRTC> {
+  WebRTCConnectionManager _webRTCConnectionManager;
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    connectRTC();
+  }
+  void connectRTC() async {
+    _webRTCConnectionManager = WebRTCConnectionManager();
+    User me = await RepositoryProvider.of<UserRepository>(context).getUser();
+    if(me.uid == "616EpQCAcLWZEFIOJ8wACg9EBzF2")
+      return;
+    LocalMediaStreamManager().muted = true;
+    Future.delayed(Duration(milliseconds: 3000), (){
+      _webRTCConnectionManager.connectPeer("616EpQCAcLWZEFIOJ8wACg9EBzF2");
+    });
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Container(child: Text("TestingRTC"));
+  }
+
+  @override
+  void dispose() async{
+    await _webRTCConnectionManager.dispose();
+    super.dispose();
+  }
+}*/

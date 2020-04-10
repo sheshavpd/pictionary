@@ -3,3 +3,5 @@ Android release:
 
 ios Release:
 1) Configure firebase authentication (https://medium.com/flutter-community/flutter-implementing-google-sign-in-71888bca24ed)
+2) Configure webrtc for ios (https://github.com/cloudwebrtc/flutter-webrtc)
+3) Configure ios for permission_handler (https://pub.dev/packages/permission_handler)

@@ -39,6 +39,8 @@ dependencies:
   liquid_progress_indicator: 0.3.2
   logger: ^0.8.3
   cached_network_image: ^2.0.0
+  flutter_webrtc: ^0.2.7
+  permission_handler: 5.0.0+hotfix.3
 
 dev_dependencies:
   flutter_test:
