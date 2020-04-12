@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/rtc_peerconnection.dart';
 import 'package:flutter_webrtc/webrtc.dart';
@@ -10,6 +11,7 @@ import 'package:pictionary/repositories/AppSocket.dart';
 import 'package:pictionary/repositories/mediastream_manager.dart';
 
 const _WEBRTC_TAG = "[WebRTC_DEBUG]";
+
 class WebRTCConnectionManager {
   final LocalMediaStreamManager _localMediaStreamManager =
       LocalMediaStreamManager();
@@ -33,24 +35,32 @@ class WebRTCConnectionManager {
   }
 
   void _initSignalHandlers() {
-    _signalHandlers[PeerConnConstants.OFFER] = (signal) async {
+
+    // implemented as per https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
+    final onOfferOrAnswer = (signal) async {
       final uid = signal['uid'];
       if (uid == null) return;
-      if (connections.containsKey(uid)) {
-        connections[uid].dispose();
+      if (!connections.containsKey(uid)) {
+        connections[uid] = await RemotePeerAudioConnection.fromOffer(uid,
+            enabled: _speakerEnabled);
       }
-      connections[uid] = await RemotePeerAudioConnection.fromOffer(
-          RTCSessionDescription(
-              signal['offer']['sdp'], signal['offer']['type']),
-          uid,
-          enabled: _speakerEnabled);
+      final rpc = connections[uid];
+      final offerCollision = signal['type'] == PeerConnConstants.OFFER &&
+          (rpc.makingOffer ||
+              rpc._peerConnection.signalingState !=
+                  RTCSignalingState.RTCSignalingStateStable);
+      rpc.ignoreOffer = rpc.impolite && offerCollision;
+      if (rpc.ignoreOffer) return;
+      if (signal['type'] == PeerConnConstants.OFFER) {
+        rpc._handleOffer(RTCSessionDescription(
+            signal['offer']['sdp'], signal['offer']['type']));
+      } else {
+        connections[signal['uid']].handleAnswer(RTCSessionDescription(
+            signal['answer']['sdp'], signal['answer']['type']));
+      }
     };
-    _signalHandlers[PeerConnConstants.ANSWER] = (signal) {
-      if (connections[signal['uid']] == null ||
-          !connections[signal['uid']].initiator) return;
-      connections[signal['uid']].handleAnswer(RTCSessionDescription(
-          signal['answer']['sdp'], signal['answer']['type']));
-    };
+    _signalHandlers[PeerConnConstants.OFFER] = onOfferOrAnswer;
+    _signalHandlers[PeerConnConstants.ANSWER] = onOfferOrAnswer;
     _signalHandlers[PeerConnConstants.CANDIDATE] = (signal) {
       connections[signal['uid']]?._handleCandidate(RTCIceCandidate(
           signal['candidate']['candidate'],
@@ -104,23 +114,29 @@ class WebRTCConnectionManager {
   }
 }
 
+// implemented as per https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation
 class RemotePeerAudioConnection {
-  final remoteRenderer = RTCVideoRenderer();
+  final RTCVideoRenderer remoteRenderer;
   final String userID;
   final RTCPeerConnection _peerConnection;
   bool _enabled = true;
+  bool ignoreOffer = false;
   final bool
-      initiator; //If this connection was initiated by me, or other. (initiator = true, means initiated by me.)
+      impolite; //If this connection was initiated by me, or other. (initiator = true, means initiated by me.)
 
   RemotePeerAudioConnection._(this._peerConnection, this.userID,
-      {this.initiator = false, @required bool enabled})
+      {this.impolite = false,
+      @required this.remoteRenderer,
+      @required bool enabled})
       : _enabled = enabled {
+    _peerConnection.onAddTrack = _onTrack;
+    _peerConnection.onRenegotiationNeeded = _onRenegotiationNeeded;
     _peerConnection.onSignalingState = _onSignalingState;
     _peerConnection.onIceGatheringState = _onIceGatheringState;
     _peerConnection.onIceConnectionState = _onIceConnectionState;
     _peerConnection.onRemoveStream = _onRemoveStream;
-    _peerConnection.onRenegotiationNeeded = _onRenegotiationNeeded;
-    alog.d("$_WEBRTC_TAG $userID  Created peerConnection object. Initiator : $initiator}");
+    alog.d(
+        "$_WEBRTC_TAG $userID  Created peerConnection object. Initiator : $impolite}");
   }
 
   set enabled(bool enabled) {
@@ -145,32 +161,30 @@ class RemotePeerAudioConnection {
 
   static Future<RemotePeerAudioConnection> initiate(String userID,
       {@required bool enabled}) async {
+    final remoteRenderer = RTCVideoRenderer();
+    await remoteRenderer.initialize();
     RTCPeerConnection _peerConnection =
         await createPeerConnection(_configuration, {});
-    final rpc = RemotePeerAudioConnection._(_peerConnection, userID,
-        initiator: true, enabled: enabled);
-    await rpc.remoteRenderer.initialize();
     await _peerConnection
         .addStream(await LocalMediaStreamManager().getLocalAudioStream());
-    _peerConnection.onAddStream = rpc._onAddStream;
+    final rpc = RemotePeerAudioConnection._(_peerConnection, userID,
+        remoteRenderer: remoteRenderer, impolite: true, enabled: enabled);
     _peerConnection.onIceCandidate = rpc._onCandidate;
     //await rpc._createOffer(); //offer created in 'negotiationneeded' event. see https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Signaling_and_video_calling for the flow.
     return rpc;
   }
 
-  static Future<RemotePeerAudioConnection> fromOffer(
-      RTCSessionDescription offer, String userID,
+  static Future<RemotePeerAudioConnection> fromOffer(String userID,
       {@required bool enabled}) async {
+    final remoteRenderer = RTCVideoRenderer();
+    await remoteRenderer.initialize();
     RTCPeerConnection _peerConnection =
         await createPeerConnection(_configuration, {});
-    final rpc = RemotePeerAudioConnection._(_peerConnection, userID,
-        initiator: false, enabled: enabled);
-    await rpc.remoteRenderer.initialize();
     await _peerConnection
         .addStream(await LocalMediaStreamManager().getLocalAudioStream());
-    _peerConnection.onAddStream = rpc._onAddStream;
+    final rpc = RemotePeerAudioConnection._(_peerConnection, userID,
+        remoteRenderer: remoteRenderer, impolite: false, enabled: enabled);
     _peerConnection.onIceCandidate = rpc._onCandidate;
-    rpc._handleOffer(offer);
     return rpc;
   }
 
@@ -180,7 +194,7 @@ class RemotePeerAudioConnection {
         "OfferToReceiveAudio": true,
         "OfferToReceiveVideo": false,
       },
-      "iceRestart":iceRestart,
+      "iceRestart": iceRestart,
       "optional": [],
     };
     RTCSessionDescription offer =
@@ -189,7 +203,7 @@ class RemotePeerAudioConnection {
     AppSocket().sendMessage(json.encode({
       'type': PeerConnConstants.OFFER,
       'uid': userID,
-      'offer': offer.toMap()
+      'offer': offer.toMap(),
     }));
   }
 
@@ -226,29 +240,37 @@ class RemotePeerAudioConnection {
     alog.d('$_WEBRTC_TAG $userID  $state');
   }
 
-  _onIceConnectionState(RTCIceConnectionState state) async{
-    if(state == RTCIceConnectionState.RTCIceConnectionStateFailed && initiator) {
+  _onIceConnectionState(RTCIceConnectionState state) async {
+    if (state == RTCIceConnectionState.RTCIceConnectionStateFailed) {
       try {
         await _createOffer(iceRestart: true);
-      } catch (e) {;
-      alog.e('$_WEBRTC_TAG $userID  $e');
+      } catch (e) {
+        alog.e('$_WEBRTC_TAG $userID  $e');
       }
     }
     alog.d('$_WEBRTC_TAG $userID  $state');
   }
 
-  _onAddStream(MediaStream stream) {
-    //alog.d('addStream: ' + stream.id);
-    remoteRenderer.srcObject = stream;
+  _onTrack(MediaStream mediaStream, MediaStreamTrack mediaStreamTrack) {
+    remoteRenderer.srcObject = mediaStream;
     enabled = _enabled; //Mute speaker, if state is muted.
   }
+
+  /*_onAddStream(MediaStream stream) {
+    //alog.d('addStream: ' + stream.id);
+    remoteRenderer.srcObject = stream;
+  }*/
 
   _onRemoveStream(MediaStream stream) {
     remoteRenderer.srcObject = null;
   }
 
-  _handleCandidate(RTCIceCandidate candidate) {
-    _peerConnection.addCandidate(candidate);
+  _handleCandidate(RTCIceCandidate candidate) async {
+    try {
+      await _peerConnection.addCandidate(candidate);
+    } catch (e) {
+      if (!ignoreOffer) throw e;
+    }
   }
 
   _onCandidate(RTCIceCandidate candidate) async {
@@ -260,20 +282,21 @@ class RemotePeerAudioConnection {
     }));
   }
 
-  bool _isNegotiating =
-      false; // Workaround for Chrome webrtc bundle (Happens only in chrome): skip nested negotiations
+  //TODO: Implement id based negotiation between peers.
+  bool makingOffer =
+      false; //Useful to implement perfect negotiation (https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation)
   _onRenegotiationNeeded() async {
     alog.d('$_WEBRTC_TAG $userID  RenegotiationNeeded');
-    if (_isNegotiating || !initiator) {
-      return;
+    if (makingOffer) {
+      return; // Workaround for Chrome webrtc bundle (Happens only in chrome): skip nested negotiations
     }
-    _isNegotiating = true;
+    makingOffer = true;
     try {
       await _createOffer(iceRestart: false);
     } catch (e) {
-     alog.e('$_WEBRTC_TAG $userID  $e');
+      alog.e('$_WEBRTC_TAG $userID  $e');
     }
-    _isNegotiating = false;
+    makingOffer = false;
   }
 
   Future<void> dispose() async {
