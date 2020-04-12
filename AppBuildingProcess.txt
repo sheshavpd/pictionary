@@ -1,0 +1,7 @@
+User separate widget to inject blocs and repositories, and separate widget for presentations.
+https://blog.jayway.com/2015/04/13/600k-concurrent-websocket-connections-on-aws-using-node-js/
+https://gist.github.com/mustafaturan/47268d8ad6d56cadda357e4c438f51ca
+https://serverfault.com/questions/769978/sysctl-cannot-stat-proc-sys-net-ipv4-netfilter-ip-conntrack-max-no-such-file
+https://askubuntu.com/questions/266991/in-ubuntu-12-10-how-to-enable-proc-net-ip-conntrack
+sudo turnadmin -a -u prouser -r turnrunner -p stun@901 //turn admin username & password (Only needed for running turn server)..
+sudo turnserver -o --stun-only --no-tcp //runs as daemon.
