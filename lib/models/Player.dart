@@ -25,8 +25,8 @@ class Player extends Equatable {
         uid: pJsonMap['uid'],
         nick: pJsonMap['nick'],
         imgURL: pJsonMap['avatar'],
-        currentScore: pJsonMap['score'],
-        totalScore: pJsonMap['totalScore']);
+        currentScore: pJsonMap['score'] ?? 0,
+        totalScore: pJsonMap['totalScore'] ?? 0);
   }
 
   Player copyWith(

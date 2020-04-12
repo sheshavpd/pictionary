@@ -136,38 +136,3 @@ class App extends StatelessWidget {
 }
 
 
-/*class TestRTC extends StatefulWidget {
-  const TestRTC();
-  @override
-  _TestRTCState createState() => _TestRTCState();
-}
-
-class _TestRTCState extends State<TestRTC> {
-  WebRTCConnectionManager _webRTCConnectionManager;
-  @override
-  void initState() {
-    // TODO: implement initState
-    super.initState();
-    connectRTC();
-  }
-  void connectRTC() async {
-    _webRTCConnectionManager = WebRTCConnectionManager();
-    User me = await RepositoryProvider.of<UserRepository>(context).getUser();
-    if(me.uid == "616EpQCAcLWZEFIOJ8wACg9EBzF2")
-      return;
-    LocalMediaStreamManager().muted = true;
-    Future.delayed(Duration(milliseconds: 3000), (){
-      _webRTCConnectionManager.connectPeer("616EpQCAcLWZEFIOJ8wACg9EBzF2");
-    });
-  }
-  @override
-  Widget build(BuildContext context) {
-    return Container(child: Text("TestingRTC"));
-  }
-
-  @override
-  void dispose() async{
-    await _webRTCConnectionManager.dispose();
-    super.dispose();
-  }
-}*/

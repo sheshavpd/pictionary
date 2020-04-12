@@ -1,12 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:bot_toast/bot_toast.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:pictionary/blocs/game/game_sv_events.dart';
 import 'package:pictionary/common/app_logger.dart';
-import 'package:pictionary/common/pretty_print.dart';
 import 'package:pictionary/models/Player.dart';
 import 'package:pictionary/models/game_answer.dart';
 import 'package:pictionary/models/game_details.dart';
@@ -18,6 +16,7 @@ import 'package:pictionary/repositories/game_repository.dart';
 import 'package:bloc/bloc.dart';
 import 'package:pictionary/repositories/webrtc_conn_manager.dart';
 import 'package:pictionary/screens/game/game_similarity_notif.dart';
+import 'package:pictionary/utils/audio_player.dart';
 import 'game.dart';
 
 class GameBloc extends Bloc<GameEvent, GameState> {
@@ -27,12 +26,27 @@ class GameBloc extends Bloc<GameEvent, GameState> {
 
   GameBloc(this._gameRepository) {
     _gameMsgListener = GameMsgHandler(this);
+    init();
+  }
+
+  void init() async{
+    _gameRepository.onExternalRoomIDReceived((roomID) {
+      final currentState = state;
+      if (!(currentState is GamePlaying)) {
+        add(GameJoinRequested(roomID));
+      } else {
+        BotToast.showText(
+            text: "Please exit current game and retry.",
+            duration: Duration(seconds: 3));
+      }
+    });
   }
 
   @override
   GameNotPlaying get initialState => GameNotPlaying();
 
   User get user => _gameRepository.user;
+
   bool get isMicGranted => _gameRepository.micPermissionsGranted;
 
   static const _MAX_ANSWERS = 15;
@@ -56,7 +70,8 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       yield GameCreating();
       try {
         //await Future.delayed(Duration(seconds: 3));
-        final newRoom = await _gameRepository.createPrivateRoom();
+        final newRoom =
+            await _gameRepository.createPrivateRoom(event.audioEnabled);
         yield GamePlaying(
             gameDetails: GameDetails(players: [
               Player(
@@ -67,14 +82,19 @@ class GameBloc extends Bloc<GameEvent, GameState> {
                   imgURL: user.avatar)
             ]),
             gameRoomID: newRoom['gameRoomID'],
-            gameRoomNick: newRoom['roomUID']);
+            gameRoomNick: newRoom['roomUID'],
+            audioEnabled: event.audioEnabled);
       } catch (error) {
         yield GameCreateFailed(error.toString());
         yield GameNotPlaying();
       }
     }
     if (event is GameJoinRequested) {
-      await _gameRepository.tryMicPermission();
+      try {
+        await _gameRepository.tryMicPermission();
+      } catch (e) {
+        alog.e(e);
+      }
       yield GameJoining();
       //await Future.delayed(Duration(seconds: 3));
       try {
@@ -83,12 +103,30 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         yield GamePlaying(
             gameDetails: gameDetails,
             gameRoomID: joinedRoom['gameRoomID'],
+            audioEnabled: joinedRoom['audio'],
             gameRoomNick: event.roomID);
       } catch (error) {
         yield GameCreateFailed(error.toString());
         yield GameNotPlaying();
       }
     }
+    if (event is GameJoinPubRequested) {
+      yield GameJoiningPub();
+      //await Future.delayed(Duration(seconds: 3));
+      try {
+        final joinedRoom = await _gameRepository.joinPub();
+        final gameDetails = GameDetails.fromJSON(joinedRoom);
+        yield GamePlaying(
+            gameDetails: gameDetails,
+            gameRoomID: joinedRoom['gameRoomID'],
+            audioEnabled: joinedRoom['audio'],
+            isPublic: true);
+      } catch (error) {
+        yield GameCreateFailed(error.toString());
+        yield GameNotPlaying();
+      }
+    }
+
     if (event is GameUserJoined) {
       final currentState = state;
       final newPlayer = event.newPlayer;
@@ -102,6 +140,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
                 players: currentState.gameDetails.players + [newPlayer]));
         BotToast.showText(
             text: "${newPlayer.nick} joined", align: Alignment(0, -0.8));
+        GameSounds().playUserJoined();
       }
     }
 
@@ -125,6 +164,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
                 currentState.gameDetails.copyWith(players: currentPlayers));
         BotToast.showText(
             text: "${removedPlayer.nick} left", align: Alignment(0, -0.8));
+        GameSounds().playUserLeft();
       }
     }
     if (event is GameHintReceived) {
@@ -144,6 +184,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         if (updatedAnswers.length >= _MAX_ANSWERS) updatedAnswers.removeLast();
         updatedAnswers.insert(0, event.gameAnswer);
         yield currentState.copyWith(answers: updatedAnswers);
+        if (event.gameAnswer.correctAnswer) GameSounds().playRightGuess();
       }
     }
 
@@ -158,7 +199,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
                       "${event.answer} is ${event.similarity}% similar");
             },
             backButtonBehavior: BackButtonBehavior.ignore,
-            duration: Duration(milliseconds: 1000));
+            duration: Duration(milliseconds: 3000));
       }
     }
 
@@ -190,6 +231,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       if (currentState is GamePlaying) {
         yield currentState.copyWith(
             drawScores: event.playerScores, lastWord: event.lastWord);
+        GameSounds().playRoundComplete();
       }
     }
 
@@ -212,6 +254,15 @@ class GameBloc extends Bloc<GameEvent, GameState> {
                 timeout: event.timeout,
                 round: 0,
                 state: GameStateConstants.ENDED));
+
+        if (updatedPlayers.length > 1) {
+          // Still in game
+          GameSounds().playGameFinish();
+        }
+        //If game is public, and game ended with only 1 player, move to GameNotPlaying.
+        if (updatedPlayers.length <= 1 && currentState.isPublic) {
+          add(GameExited());
+        }
       }
     }
 
@@ -293,6 +344,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
   @override
   Future<void> close() {
     // TODO: implement close
+    _gameRepository.dispose();
     _gameMsgListener.dispose();
     return super.close();
   }

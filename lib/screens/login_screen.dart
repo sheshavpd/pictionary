@@ -3,13 +3,10 @@ import 'package:flutter/cupertino.dart';
 import '../blocs/authentication/authentication.dart';
 import '../blocs/login/login.dart';
 import '../repositories/user_repository.dart';
-import '../widgets/bubble_indication_painter.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/scheduler.dart' show timeDilation;
-import '../styles/theme.dart' as CustomTheme;
 import '../widgets/game_button.dart';
 
 class LoginPage extends StatelessWidget {
@@ -34,13 +31,21 @@ class LoginForm extends StatefulWidget {
   _LoginFormState createState() => new _LoginFormState();
 }
 
-class _LoginFormState extends State<LoginForm> {
+class _LoginFormState extends State<LoginForm>
+    with SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
 
-  TextEditingController _loginStaffNoController = TextEditingController();
-  TextEditingController _loginOTPController = TextEditingController();
+  AnimationController _containerAnimationController;
+  Animation<double> _containerAnimation;
+  @override
+  void initState() {
+    super.initState();
+    _containerAnimationController =
+        AnimationController(vsync: this, duration: Duration(milliseconds: 2000));
+    _containerAnimation = Tween(begin: -5.0, end: 5.0).animate(_containerAnimationController);
 
-  FocusNode _otpFocusNode = FocusNode();
+    _containerAnimationController.repeat(reverse: true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +70,7 @@ class _LoginFormState extends State<LoginForm> {
               }
             },
             child: SizedBox.expand(
-              child:  Container(
+              child: Container(
                 color: Colors.black,
                 padding: EdgeInsets.only(top: 75, bottom: 40),
                 child: Column(
@@ -74,15 +79,22 @@ class _LoginFormState extends State<LoginForm> {
                   children: <Widget>[
                     Column(
                       children: <Widget>[
-                        Image(
-                            height: 80.0,
-                            width: 80.0,
-                            image: AssetImage(
-                                'assets/images/qg_glow.png')),
+                        AnimatedBuilder(
+                            animation: _containerAnimation,
+                            builder: (context, index) {
+                              return Container(
+                                  transform: Matrix4.translationValues(0,
+                                      _containerAnimation.value, 0.0),
+                                  child: Image(
+                                      height: 80.0,
+                                      width: 80.0,
+                                      image: AssetImage(
+                                          'assets/images/qg_glow.png')));
+                            }),
                         Image(
                             width: 230.0,
-                            image: AssetImage(
-                                'assets/images/qg_text_glow.png')),
+                            image:
+                                AssetImage('assets/images/qg_text_glow.png')),
                       ],
                     ),
                     const _LoginBtnWidget()
@@ -96,15 +108,8 @@ class _LoginFormState extends State<LoginForm> {
 
   @override
   void dispose() {
+    _containerAnimationController.dispose();
     super.dispose();
-    _otpFocusNode.dispose();
-    _loginOTPController.dispose();
-    _loginStaffNoController.dispose();
-  }
-
-  @override
-  void initState() {
-    super.initState();
   }
 }
 
@@ -115,40 +120,37 @@ class _LoginBtnWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final loginBloc = BlocProvider.of<LoginBloc>(context);
     return FancyButton(
-        child: BlocBuilder<LoginBloc, LoginState>(builder: (context, state) {
-          if (state is LoginLoading) {
-            return SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ));
-          } else {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.ideographic,
-              children: <Widget>[
-                Icon(
-                  FontAwesomeIcons.google,
-                  color: Colors.white,
-                  size: 20.0,
-                ),
-                Text(
-                  " Sign in with Google",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20.0),
-                )
-              ],
-            );
-          }
-        }),
-        size: 30,
-        color: Theme.of(context).accentColor,
-        onPressed: (){
-        if(!(loginBloc.state is LoginLoading))
-            loginBloc.add(LoginToGoogle());
+      child: BlocBuilder<LoginBloc, LoginState>(builder: (context, state) {
+        if (state is LoginLoading) {
+          return SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ));
+        } else {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.ideographic,
+            children: <Widget>[
+              Icon(
+                FontAwesomeIcons.google,
+                color: Colors.white,
+                size: 20.0,
+              ),
+              Text(
+                " Sign in with Google",
+                style: TextStyle(color: Colors.white, fontSize: 20.0),
+              )
+            ],
+          );
+        }
+      }),
+      size: 30,
+      color: Theme.of(context).accentColor,
+      onPressed: () {
+        if (!(loginBloc.state is LoginLoading)) loginBloc.add(LoginToGoogle());
       },
     );
   }

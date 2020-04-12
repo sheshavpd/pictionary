@@ -26,6 +26,12 @@ class GameJoining extends GameState {
   String toString() => 'GameJoining';
 }
 
+class GameJoiningPub extends GameState {
+  @override
+  String toString() => 'GameJoiningPub';
+}
+
+
 class GameCreateFailed extends GameState {
   final String failReason;
 
@@ -43,6 +49,8 @@ class GamePlaying extends GameState {
   final Map drawScores;
   final String gameRoomID;
   final String gameRoomNick;
+  final bool isPublic;
+  final bool audioEnabled;
   final String hint;
   final String lastWord;
   final Player lastWinner;
@@ -53,6 +61,8 @@ class GamePlaying extends GameState {
       this.wordsToChoose,
       this.gameRoomID,
       this.gameRoomNick,
+      this.isPublic = false,
+      this.audioEnabled,
       this.hint,
       this.lastWord,
       this.lastWinner,
@@ -66,7 +76,9 @@ class GamePlaying extends GameState {
       Map drawScores,
       String gameRoomID,
       String gameRoomNick,
-        Player lastWinner,
+      bool isPublic,
+      bool audioEnabled,
+      Player lastWinner,
       String hint,
       String lastWord}) {
     return GamePlaying(
@@ -75,6 +87,8 @@ class GamePlaying extends GameState {
         wordsToChoose: wordsToChoose ?? this.wordsToChoose,
         gameRoomID: gameRoomID ?? this.gameRoomID,
         gameRoomNick: gameRoomNick ?? this.gameRoomNick,
+        isPublic: isPublic ?? this.isPublic,
+        audioEnabled: audioEnabled ?? this.audioEnabled,
         hint: hint ?? this.hint,
         lastWinner: lastWinner ?? this.lastWinner,
         drawScores: drawScores ?? this.drawScores,
@@ -85,10 +99,12 @@ class GamePlaying extends GameState {
   List<Object> get props => [
         this.gameRoomID,
         gameRoomNick,
+        isPublic,
+        audioEnabled,
         hint,
         lastWord,
         wordsToChoose,
-    lastWinner,
+        lastWinner,
         gameDetails,
         drawScores,
         answers,
@@ -96,6 +112,10 @@ class GamePlaying extends GameState {
 
   @override
   String toString() {
+    return "GamePlaying";
+  }
+
+  String toVerboseString() {
     return prettyPrint({
       'gameRoomID': this.gameRoomID,
       'gameRoomNick': gameRoomNick,

@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "1028714381060-bpht199rfhnqip84cl5ns8hc915m0aum.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.quarantinegames.pictionary",
+            "certificate_hash": "6d03fc551ba281ceaeb4b8c500c2a6cfc64c84c9"
+          }
+        },
+        {
           "client_id": "1028714381060-nm1lcjafj0hhlnunsn9ch4ohip4n6rhu.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

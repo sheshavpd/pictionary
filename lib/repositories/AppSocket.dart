@@ -79,11 +79,13 @@ class AppSocket {
 
   Timer _keepAliveTimer, _retryTimer;
 
+  static const PING_MSG = "ping";
+  static const PING_INTERVAL = 20000;
   void _keepAlive() {
     _keepAliveTimer =
-        Timer.periodic(const Duration(milliseconds: 20000), (timer) {
+        Timer.periodic(const Duration(milliseconds: PING_INTERVAL), (timer) {
           if (isSocketOpen()) {
-            _webSocket.add("ping");
+            _webSocket.add(PING_MSG);
           }
         });
   }

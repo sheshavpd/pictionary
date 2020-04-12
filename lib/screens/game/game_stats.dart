@@ -136,7 +136,7 @@ class GameStatsDialog extends StatelessWidget {
     return AnimatedSwitcher(
       duration: Duration(milliseconds: 400),
       child: state.gameDetails.state == GameStateConstants.CHOOSING
-          ? Text("${state.gameDetails.currentArtist.nick} is the artist",
+          ? Text("${state.gameDetails.currentArtist.nick} is drawing next",
               softWrap: true,
               textAlign: TextAlign.center,
               style: TextStyle(

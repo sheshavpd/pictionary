@@ -1,5 +1,6 @@
 import 'package:flutter_webrtc/get_user_media.dart';
 import 'package:flutter_webrtc/media_stream.dart';
+import 'package:pictionary/common/app_logger.dart';
 
 class LocalMediaStreamManager {
   MediaStream _localStream;
@@ -29,8 +30,8 @@ class LocalMediaStreamManager {
   Future<MediaStream> getLocalAudioStream() async{
     if(_localStream == null) {
       _localStream = await navigator.getUserMedia(_mediaConstraints);
-      if(_localStream.getAudioTracks() != null && _localStream.getAudioTracks().length > 0)
-        _localStream.getAudioTracks()[0].enableSpeakerphone(true);
+      /*if(_localStream.getAudioTracks() != null && _localStream.getAudioTracks().length > 0)
+        _localStream.getAudioTracks()[0].enableSpeakerphone(true);*/
       muted = _isMuted;
     }
     return _localStream;
@@ -38,7 +39,7 @@ class LocalMediaStreamManager {
 
   set muted(bool muted) {
     if(_localStream != null && _localStream.getAudioTracks() != null && _localStream.getAudioTracks().length > 0) {
-        _localStream.getAudioTracks()[0].setMicrophoneMute(muted);
+        _localStream.getAudioTracks()[0].enabled = !muted;
     }
     _isMuted = muted;
   }
@@ -49,6 +50,7 @@ class LocalMediaStreamManager {
         await _localStream.dispose();
       }catch(e){print(e);}
     }
+    alog.d("Disposed local media stream");
     _localStream = null;
   }
 

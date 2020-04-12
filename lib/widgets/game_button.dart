@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pictionary/utils/audio_player.dart';
 
 class FancyButton extends StatefulWidget {
   const FancyButton({
@@ -75,6 +76,7 @@ class _FancyButtonState extends State<FancyButton> with TickerProviderStateMixin
         _animationController.animateTo(0.0);
         widget.onPressed?.call();
       });
+      GameSounds().playClick();
     }
   }
 

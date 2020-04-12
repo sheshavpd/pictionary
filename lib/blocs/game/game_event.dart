@@ -11,8 +11,19 @@ abstract class GameEvent extends Equatable {
 }
 
 class GameCreateRequested extends GameEvent {
+  final bool audioEnabled;
+
+  GameCreateRequested(this.audioEnabled);
   @override
   String toString() => 'GameCreateRequested';
+  @override
+  List<Object> get props => [audioEnabled];
+}
+
+class GameJoinPubRequested extends GameEvent {
+  @override
+  String toString() => 'GameJoinPubRequested';
+
 }
 
 class GameJoinRequested extends GameEvent {

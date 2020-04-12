@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pictionary/blocs/game/game.dart';
 import 'package:pictionary/blocs/game/game_bloc.dart';
 import 'package:pictionary/blocs/game/game_event.dart';
+import 'package:pictionary/utils/helpers.dart';
 import 'package:pictionary/widgets/game_button.dart';
 
 
@@ -84,7 +85,7 @@ class GameCreationDialog extends StatelessWidget {
                 SizedBox(height: 16.0),
                 FancyButton(
                   onPressed: () {
-
+                    shareGameInvitation(roomID);
                   },
                   size: 30,
                   color: Colors.deepPurpleAccent,

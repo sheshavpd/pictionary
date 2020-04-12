@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:pictionary/blocs/audiortc/audio.dart';
 import 'package:pictionary/blocs/canvas/canvas.dart';
+import 'package:pictionary/blocs/connection/connection.dart';
 import 'package:pictionary/blocs/game/game.dart';
 import 'package:pictionary/blocs/game/game_sv_events.dart';
-import 'package:pictionary/repositories/mediastream_manager.dart';
-import 'package:pictionary/repositories/webrtc_conn_manager.dart';
 import 'package:pictionary/screens/game/game_draw_screen.dart';
 import 'package:pictionary/screens/game/game_messages.dart';
 import 'package:pictionary/screens/game/game_stats.dart';
@@ -20,84 +20,99 @@ import 'package:pictionary/widgets/game_button.dart';
 import 'package:pictionary/widgets/placeholder_image.dart';
 
 import 'answer_hint.dart';
+import 'exit_confirmation.dart';
 import 'game_players.dart';
 
 const _HEADER_HEIGHT = 40.0;
 
-class GameScreen extends StatefulWidget {
-  @override
-  _GameScreenState createState() => _GameScreenState();
-}
-
-class _GameScreenState extends State<GameScreen> {
-  WebRTCConnectionManager _webRTCConnectionManager;
-  @override
-  void initState() {
-    // TODO: implement initState
-    super.initState();
-    GameBloc gameBloc = BlocProvider.of<GameBloc>(context);
-    if(!gameBloc.isMicGranted || !(gameBloc.state is GamePlaying))
-      return;
-    _webRTCConnectionManager = WebRTCConnectionManager();
-    final players = (gameBloc.state as GamePlaying).gameDetails.players;
-    //If there are only 2 players, let the second player initiate the peer connection.
-    if(players.length <= 2 && players[0].uid != gameBloc.user.uid)
-      return;
-    players?.forEach((p) {
-      if(p.uid != gameBloc.user.uid)
-        _webRTCConnectionManager.connectPeer(p.uid);
-    });
-  }
+class GameScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    if (!(BlocProvider.of<GameBloc>(context).state is GamePlaying)) {
+    final GameBloc _gameBloc = BlocProvider.of<GameBloc>(context);
+    if (!(_gameBloc.state is GamePlaying)) {
       //BlocProvider.of<GameBloc>(context).add(GameTest());
       return SizedBox.shrink();
     }
-    return BlocProvider<CanvasBloc>(
-      create: (context) => CanvasBloc(BlocProvider.of<GameBloc>(context)),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<CanvasBloc>(create: (context) => CanvasBloc(_gameBloc)),
+        BlocProvider<AudioBloc>(
+            lazy: false,
+            create: (context) {
+              return AudioBloc(_gameBloc)
+                ..add(AudioSetInGameAudioEnabled(_gameBloc.isMicGranted &&
+                    (_gameBloc.state as GamePlaying).audioEnabled));
+            })
+      ],
       child: _GameRoot(),
     );
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-    _webRTCConnectionManager.dispose();
   }
 }
 
 class _GameRoot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<GameBloc, GameState>(
-      condition: (previous, present) {
-        return (present is GamePlaying) &&
-            (previous as GamePlaying).gameDetails.state !=
-                (present as GamePlaying).gameDetails.state;
+    return BlocListener<ConnectionBloc, AppConnectionState>(
+      listener: (context, state) {
+        if (!(state is ConnectionConnected)) {
+          showDialog(
+            context: context,
+            builder: (BuildContext DialogCtx) {
+              return AlertDialog(
+                title: Text(
+                  "Sorry!",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                content: Text(
+                    "Yout connection doesn't seem to be stable. You got disconnected from the game :("),
+                actions: <Widget>[
+                  // usually buttons at the bottom of the dialog
+                  FancyButton(
+                    size: 20,
+                    color: Theme.of(context).primaryColor,
+                    child: Text(
+                      "I understand",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    onPressed: () async {
+                      Navigator.of(DialogCtx).pop();
+                    },
+                  )
+                ],
+              );
+            },
+          );
+          BlocProvider.of<GameBloc>(context).add(GameExited());
+        }
       },
-      builder: (context, state) {
-        final cState = state as GamePlaying;
-        final iAmCurrentArtist = cState.gameDetails.currentArtist != null &&
-            cState.gameDetails.currentArtist.uid ==
-                BlocProvider.of<GameBloc>(context).user.uid;
-        return Stack(
-          children: <Widget>[
-            (cState.gameDetails.state == GameStateConstants.DRAWING &&
-                iAmCurrentArtist)
-                ? GameDrawScreen()
-                : _GuessingScreen(),
-            cState.gameDetails.state == GameStateConstants.CHOOSING ||
-                cState.gameDetails.state == GameStateConstants.ENDED
-                ? GameStatsDialog()
-                : SizedBox.shrink()
-          ],
-        );
-      },
+      child: BlocBuilder<GameBloc, GameState>(
+        condition: (previous, present) {
+          return (present is GamePlaying) &&
+              (previous as GamePlaying).gameDetails.state !=
+                  (present as GamePlaying).gameDetails.state;
+        },
+        builder: (context, state) {
+          final cState = state as GamePlaying;
+          final iAmCurrentArtist = cState.gameDetails.currentArtist != null &&
+              cState.gameDetails.currentArtist.uid ==
+                  BlocProvider.of<GameBloc>(context).user.uid;
+          return Stack(
+            children: <Widget>[
+              (cState.gameDetails.state == GameStateConstants.DRAWING &&
+                      iAmCurrentArtist)
+                  ? GameDrawScreen()
+                  : _GuessingScreen(),
+              cState.gameDetails.state == GameStateConstants.CHOOSING ||
+                      cState.gameDetails.state == GameStateConstants.ENDED
+                  ? GameStatsDialog()
+                  : SizedBox.shrink()
+            ],
+          );
+        },
+      ),
     );
   }
 }
-
 
 class _GuessingScreen extends StatelessWidget {
   @override
@@ -140,8 +155,7 @@ class _GuessingScreen extends StatelessWidget {
 class _GameFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final roomNick =
-        (BlocProvider.of<GameBloc>(context).state as GamePlaying).gameRoomNick;
+    final state = (BlocProvider.of<GameBloc>(context).state as GamePlaying);
     return Container(
       padding: EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -162,15 +176,19 @@ class _GameFooter extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
-          FancyButton(
-            color: Colors.purple,
-            size: 20,
-            child: Text(
-              "Invite",
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            onPressed: () {},
-          ),
+          state.isPublic
+              ? SizedBox.shrink()
+              : FancyButton(
+                  color: Colors.purple,
+                  size: 20,
+                  child: Text(
+                    "Invite",
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                  onPressed: () {
+                    shareGameInvitation(state.gameRoomNick);
+                  },
+                ),
           Flexible(
             child: Container(
               margin: EdgeInsets.only(left: 5, right: 5),
@@ -179,13 +197,16 @@ class _GameFooter extends StatelessWidget {
                   borderRadius: BorderRadius.circular(5)),
               child: FlatButton(
                 onPressed: () {
-                  Clipboard.setData(ClipboardData(text: roomNick));
+                  if(state.isPublic)
+                    return;
+                  Clipboard.setData(
+                      ClipboardData(text: state.gameRoomNick));
                   BotToast.showText(text: "Copied!");
                 },
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 padding: EdgeInsets.all(0),
                 child: Text(
-                  "$roomNick",
+                  "${state.isPublic?'Public room':state.gameRoomNick}",
                   style: TextStyle(color: Colors.white),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -194,38 +215,49 @@ class _GameFooter extends StatelessWidget {
           ),
           Row(
             children: <Widget>[
-              FancyButton(
-                color: Colors.purple,
-                size: 20,
-                child: Icon(
-                  FontAwesomeIcons.microphone,
-                  color: Colors.white,
-                  size: 17.0,
-                ),
-                onPressed: () {},
-              ),
+              BlocBuilder<AudioBloc, AudioState>(builder: (context, state) {
+                if (state.audioEnabledInGame) {
+                  return FancyButton(
+                    color: Colors.purple,
+                    size: 20,
+                    child: Icon(
+                      state.speakerEnabled
+                          ? FontAwesomeIcons.volumeUp
+                          : FontAwesomeIcons.volumeMute,
+                      color: Colors.white,
+                      size: 17.0,
+                    ),
+                    onPressed: () {
+                      BlocProvider.of<AudioBloc>(context)
+                          .add(AudioSetSpeaker(!state.speakerEnabled));
+                    },
+                  );
+                }
+                return SizedBox.shrink();
+              }),
               SizedBox(width: 10),
               FancyButton(
                 color: Colors.purple,
                 size: 20,
-                child: Icon(
-                  FontAwesomeIcons.volumeUp,
-                  color: Colors.white,
-                  size: 17.0,
-                ),
-                onPressed: () {},
-              ),
-              SizedBox(width: 10),
-              FancyButton(
-                color: Colors.purple,
-                size: 20,
-                child: Icon(
-                  FontAwesomeIcons.signOutAlt,
-                  color: Colors.white,
-                  size: 17.0,
+                child: Row(
+                  children: <Widget>[
+                    Text("Exit",
+                        style: TextStyle(color: Colors.white, fontSize: 15)),
+                    SizedBox(width: 5),
+                    Icon(
+                      FontAwesomeIcons.signOutAlt,
+                      color: Colors.white,
+                      size: 20.0,
+                    )
+                  ],
                 ),
                 onPressed: () {
-                  BlocProvider.of<GameBloc>(context).add(GameExited());
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext ctx) {
+                      return ExitConfirmationDialog(gameContext: context);
+                    },
+                  );
                 },
               )
             ],
@@ -236,7 +268,6 @@ class _GameFooter extends StatelessWidget {
   }
 }
 
-
 class _AnswerField extends StatefulWidget {
   @override
   __AnswerFieldState createState() => __AnswerFieldState();
@@ -244,6 +275,32 @@ class _AnswerField extends StatefulWidget {
 
 class __AnswerFieldState extends State<_AnswerField> {
   final _controller = TextEditingController();
+
+  Widget _renderAudioControls() {
+    return BlocBuilder<AudioBloc, AudioState>(builder: (context, state) {
+      if (state.audioEnabledInGame) {
+        return Container(
+          margin: EdgeInsets.only(left: 10),
+          child: FancyButton(
+            color: Colors.purple,
+            size: 20,
+            child: Icon(
+              state.audioRecording
+                  ? FontAwesomeIcons.microphone
+                  : FontAwesomeIcons.microphoneSlash,
+              color: Colors.white,
+              size: 17.0,
+            ),
+            onPressed: () {
+              BlocProvider.of<AudioBloc>(context)
+                  .add(AudioSetMicrophone(!state.audioRecording));
+            },
+          ),
+        );
+      }
+      return SizedBox.shrink();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -281,7 +338,8 @@ class __AnswerFieldState extends State<_AnswerField> {
                   .add(GuessSubmitted(_controller.text.trim()));
               _controller.text = "";
             },
-          )
+          ),
+          _renderAudioControls()
         ],
       ),
     );
