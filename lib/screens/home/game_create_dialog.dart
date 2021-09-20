@@ -66,7 +66,8 @@ class GameCreationDialog extends StatelessWidget {
                         child: IconButton(
                           onPressed: () {
                             Clipboard.setData(ClipboardData(text: this.roomID));
-                            BotToast.showText(text: "Copied!");
+                            BotToast.showText(text: "Copied!",
+                                duration: Duration(seconds: 2));
                           },
                           icon: Icon(Icons.content_copy, size: 18),
                         ),

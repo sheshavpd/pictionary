@@ -174,7 +174,7 @@ class _GameFooter extends StatelessWidget {
           ]),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           state.isPublic
               ? SizedBox.shrink()
@@ -201,7 +201,8 @@ class _GameFooter extends StatelessWidget {
                     return;
                   Clipboard.setData(
                       ClipboardData(text: state.gameRoomNick));
-                  BotToast.showText(text: "Copied!");
+                  BotToast.showText(text: "Copied!",
+                      duration: Duration(seconds: 2));
                 },
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 padding: EdgeInsets.all(0),

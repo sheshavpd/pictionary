@@ -9,8 +9,16 @@ import 'package:pictionary/blocs/game/game_sv_events.dart';
 import 'package:pictionary/common/app_logger.dart';
 import 'package:pictionary/repositories/AppSocket.dart';
 import 'package:pictionary/repositories/mediastream_manager.dart';
+import 'package:rxdart/subjects.dart';
 
 const _WEBRTC_TAG = "[WebRTC_DEBUG]";
+
+class RTCIceStateMsg {
+  final String uid;
+  final RTCIceConnectionState iceConnectionState;
+
+  RTCIceStateMsg(this.uid, this.iceConnectionState);
+}
 
 class WebRTCConnectionManager {
   final LocalMediaStreamManager _localMediaStreamManager =
@@ -18,6 +26,7 @@ class WebRTCConnectionManager {
   StreamSubscription<String> _socketMsgSubs;
   final Map<String, RemotePeerAudioConnection> connections = {};
   final Map<String, Function(Map msg)> _signalHandlers = {};
+  final userIceStateStream = PublishSubject<RTCIceStateMsg>();
   bool _speakerEnabled = true;
 
   static WebRTCConnectionManager _webRTCConnectionManager;
@@ -45,12 +54,16 @@ class WebRTCConnectionManager {
             enabled: _speakerEnabled);
       }
       final rpc = connections[uid];
+      alog.d('$_WEBRTC_TAG Received new ${signal['type']}');
       final offerCollision = signal['type'] == PeerConnConstants.OFFER &&
           (rpc.makingOffer ||
               rpc._peerConnection.signalingState !=
                   RTCSignalingState.RTCSignalingStateStable);
       rpc.ignoreOffer = rpc.impolite && offerCollision;
-      if (rpc.ignoreOffer) return;
+      if (rpc.ignoreOffer) {
+        alog.d('$_WEBRTC_TAG  Ignored ${signal['type']}');
+        return;
+      }
       if (signal['type'] == PeerConnConstants.OFFER) {
         rpc._handleOffer(RTCSessionDescription(
             signal['offer']['sdp'], signal['offer']['type']));
@@ -89,28 +102,39 @@ class WebRTCConnectionManager {
 
   void connectPeer(String uid) async {
     if (connections.containsKey(uid)) {
-      connections[uid].dispose();
+      await connections[uid].dispose();
       return;
     }
     connections[uid] =
         await RemotePeerAudioConnection.initiate(uid, enabled: _speakerEnabled);
   }
 
-  void disconnectPeer(String uid) async {
+  Future<void> disconnectPeer(String uid) async {
     if (connections.containsKey(uid)) {
-      connections[uid].dispose();
+      await connections[uid].dispose();
       connections.remove(uid);
       return;
     }
   }
 
+  static disconnectIfInstanceExists(String uid) {
+    if(_webRTCConnectionManager != null)
+    _webRTCConnectionManager.disconnectPeer(uid);
+  }
+
+  static nofityIfInstanceExists(RTCIceStateMsg iceStateMsg) {
+    if(_webRTCConnectionManager != null)
+      _webRTCConnectionManager.userIceStateStream.add(iceStateMsg);
+  }
+
   Future<void> dispose() async {
+    _webRTCConnectionManager = null;
     _socketMsgSubs?.cancel();
     for (final conn in connections.values) {
       await conn.dispose();
     }
+    userIceStateStream.close();
     await _localMediaStreamManager.disposeLocalAudioStream();
-    _webRTCConnectionManager = null;
   }
 }
 
@@ -205,6 +229,7 @@ class RemotePeerAudioConnection {
       'uid': userID,
       'offer': offer.toMap(),
     }));
+    alog.d('$_WEBRTC_TAG  created offer. Sent over.');
   }
 
   _handleOffer(RTCSessionDescription offer) async {
@@ -226,14 +251,19 @@ class RemotePeerAudioConnection {
       'uid': userID,
       'answer': answer.toMap()
     }));
+    alog.d('$_WEBRTC_TAG  handled offer. Sent answer');
   }
 
   handleAnswer(RTCSessionDescription answer) {
+    alog.d('$_WEBRTC_TAG  handled answer. Remote description set');
     _peerConnection.setRemoteDescription(answer);
   }
 
   _onSignalingState(RTCSignalingState state) {
     alog.d('$_WEBRTC_TAG $userID  $state');
+    if(state == RTCSignalingState.RTCSignalingStateClosed) {
+      WebRTCConnectionManager.disconnectIfInstanceExists(userID); // Because instance might be closed when this event happens.
+    }
   }
 
   _onIceGatheringState(RTCIceGatheringState state) {
@@ -241,6 +271,7 @@ class RemotePeerAudioConnection {
   }
 
   _onIceConnectionState(RTCIceConnectionState state) async {
+    WebRTCConnectionManager.nofityIfInstanceExists(RTCIceStateMsg(userID, state)); // Because instance might be closed when this event happens.
     if (state == RTCIceConnectionState.RTCIceConnectionStateFailed) {
       try {
         await _createOffer(iceRestart: true);
@@ -286,10 +317,13 @@ class RemotePeerAudioConnection {
   bool makingOffer =
       false; //Useful to implement perfect negotiation (https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation)
   _onRenegotiationNeeded() async {
-    alog.d('$_WEBRTC_TAG $userID  RenegotiationNeeded');
-    if (makingOffer) {
+    //TODO: Shouldn't return for being a polite peer. But, somehow this seems to resolve negotiation.
+    // Since this application doesn't need renegotiation after user switches between
+    // different networks (because game quits when that happens), this should be fine.
+    if (!impolite || makingOffer) {
       return; // Workaround for Chrome webrtc bundle (Happens only in chrome): skip nested negotiations
     }
+    alog.d('$_WEBRTC_TAG $userID  RenegotiationNeeded');
     makingOffer = true;
     try {
       await _createOffer(iceRestart: false);

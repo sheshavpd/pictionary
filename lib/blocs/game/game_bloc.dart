@@ -132,6 +132,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       final newPlayer = event.newPlayer;
       if (currentState is GamePlaying &&
           currentState.gameRoomID == event.gameRoomID) {
+        WebRTCConnectionManager().connectPeer(newPlayer.uid);
         //Remove the player if exists.
         currentState.gameDetails.players
             .removeWhere((player) => player.uid == newPlayer.uid);
@@ -139,7 +140,8 @@ class GameBloc extends Bloc<GameEvent, GameState> {
             gameDetails: currentState.gameDetails.copyWith(
                 players: currentState.gameDetails.players + [newPlayer]));
         BotToast.showText(
-            text: "${newPlayer.nick} joined", align: Alignment(0, -0.8));
+            text: "${newPlayer.nick} joined", align: Alignment(0, -0.8),
+            duration: Duration(seconds: 3));
         GameSounds().playUserJoined();
       }
     }
@@ -163,7 +165,8 @@ class GameBloc extends Bloc<GameEvent, GameState> {
             gameDetails:
                 currentState.gameDetails.copyWith(players: currentPlayers));
         BotToast.showText(
-            text: "${removedPlayer.nick} left", align: Alignment(0, -0.8));
+            text: "${removedPlayer.nick} left", align: Alignment(0, -0.8),
+            duration: Duration(seconds: 3));
         GameSounds().playUserLeft();
       }
     }

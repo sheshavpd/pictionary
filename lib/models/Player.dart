@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:pictionary/common/pretty_print.dart';
 
-import '../utils/utils.dart';
 import 'package:equatable/equatable.dart';
 
 class Player extends Equatable {
